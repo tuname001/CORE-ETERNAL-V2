@@ -5,8 +5,8 @@
   "background_color": "#000000",
   "display": "standalone",
   "orientation": "landscape",
-  "scope": ".",
-  "start_url": ".",
+  "scope": "/core-eternal-v2/",
+  "start_url": "./index.html",
   "icons": [
     {
       "src": "icon.png",
@@ -20,6 +20,7 @@
     }
   ]
 }
+
 
 
 
