@@ -1,0 +1,17 @@
+{
+  "name": "CORE ETERNAL",
+  "short_name": "CORE",
+  "theme_color": "#000000",
+  "background_color": "#000000",
+  "display": "standalone",
+  "orientation": "landscape",
+  "scope": "https://tuname001.github.io/CORE-ETERNAL/",
+  "start_url": "https://tuname001.github.io/CORE-ETERNAL/index.html",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

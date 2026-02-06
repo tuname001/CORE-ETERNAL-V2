@@ -1,0 +1,2849 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORE: ETERNAL</title>
+    <link rel="manifest" href="app.json">
+    <link rel="apple-touch-icon" href="icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="CORE">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+
+        :root {
+            --theme-color: #00f7ff; 
+            --theme-dim: #005f6b;
+            --bg-color: #020205;
+            --panel-bg: rgba(5, 10, 20, 0.65);
+            --text: #e0f0ff;
+            --accent: #ff0055;
+            --gold: #ffd700;
+            --rare: #b042ff;
+            --unique: #00ff00;
+            --ether: #ffffff;
+            --god: #00ffff; /* 真化用カラー */
+            --boost: #ff8800;
+        }
+
+        body {
+            margin: 0; overflow: hidden; background-color: var(--bg-color); color: var(--text);
+            font-family: 'Roboto Mono', monospace;
+        }
+
+        #bg-grid {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2;
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+        }
+
+        #bg-glow {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;
+            background-color: var(--theme-color);
+            opacity: 0;
+            transition: none !important;
+            pointer-events: none;
+            mix-blend-mode: screen;
+        }
+
+        body.low-perf * {
+            text-shadow: none !important;
+            box-shadow: none !important;
+            filter: none !important;
+            backdrop-filter: none !important;
+        }
+        body.low-perf .sidebar, body.low-perf .phase-container, body.low-perf .modal-content {
+            background: rgba(10, 15, 25, 0.95) !important;
+        }
+        body.no-blur .sidebar, body.no-blur .phase-container, body.no-blur .modal-content {
+            backdrop-filter: none !important;
+            background: rgba(10, 15, 25, 0.9) !important;
+        }
+
+        h1, h2, h3, .tech-font { 
+            font-family: 'Orbitron', sans-serif; 
+            letter-spacing: 1px; 
+            text-shadow: 0 0 5px currentColor;
+        }
+
+        #particleCanvas {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0; pointer-events: none;
+            filter: blur(0.5px) contrast(1.2);
+        }
+
+        #game-layout {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: grid; grid-template-columns: 380px 1fr 380px; z-index: 10;
+        }
+
+        .sidebar {
+            background: var(--panel-bg);
+            border-right: 1px solid rgba(255,255,255,0.1); 
+            border-left: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+            display: flex; flex-direction: column; padding: 10px; 
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+            transition: border-color 1s ease;
+            padding-bottom: 20px;
+        }
+        
+        .scroll-area { 
+            flex-grow: 1; overflow-y: auto; overflow-x: hidden; padding-right: 5px; 
+            padding-bottom: 80px; 
+            scrollbar-width: thin;
+            scrollbar-color: var(--theme-dim) transparent;
+        }
+
+        #center-stage {
+            position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
+        }
+        
+        #header-stats { 
+            position: absolute; top: 30px; text-align: center; width: 100%; pointer-events: none; 
+            z-index: 20;
+        }
+        #score-display { 
+            font-family: 'Orbitron'; 
+            font-size: 2.5rem; /* 3remから少し縮小 */
+            font-weight: 700; 
+            color: #fff;
+            text-shadow: 0 0 10px var(--theme-color), 0 0 20px var(--theme-color), 0 0 40px var(--theme-color);
+            transition: text-shadow 1s;
+            white-space: nowrap; /* 折り返し防止 */
+        }
+        #mps-display { 
+            color: var(--theme-color); font-size: 1.1rem; margin-top: 5px; transition: color 1s;
+            text-shadow: 0 0 5px var(--theme-color);
+        }
+        
+        #header-relic-display {
+            color: var(--rare); font-size: 1.3rem; font-weight: bold; margin: 5px 0; 
+            text-shadow: 0 0 10px var(--rare), 0 0 20px var(--rare); 
+            font-family: 'Orbitron';
+        }
+
+        .phase-container {
+            position: absolute; bottom: 50px;
+            left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.6); 
+            border: 1px solid var(--theme-color);
+            box-shadow: 0 0 15px var(--theme-dim);
+            border-radius: 4px; padding: 10px 20px; width: 60%; pointer-events: auto;
+            text-align: center; z-index: 20;
+            backdrop-filter: blur(5px);
+        }
+        #stage-badge {
+            font-family: 'Orbitron'; font-size: 1rem; color: var(--theme-color);
+            text-transform: uppercase; letter-spacing: 2px;
+            margin-bottom: 8px; display: block;
+            text-shadow: 0 0 5px var(--theme-color);
+        }
+        #stage-progress-bg { width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
+        #stage-progress-fill { 
+            height: 100%; width: 0%; background: var(--theme-color); 
+            transition: width 0.3s, background 1s; 
+            box-shadow: 0 0 10px var(--theme-color);
+        }
+        #stage-req-text { font-size: 0.8rem; color: #ccc; margin-top: 6px; font-family: 'Orbitron'; }
+
+        #reactor-wrapper {
+            width: 280px; height: 280px; position: relative; cursor: pointer; pointer-events: auto;
+            transition: transform 0.05s; z-index: 5; margin-bottom: 20px;
+            display: flex; align-items: center; justify-content: center;
+            filter: drop-shadow(0 0 15px var(--theme-color));
+        }
+        #reactor-wrapper:active { transform: scale(0.95); filter: drop-shadow(0 0 25px var(--theme-color)); }
+
+        .r-layer {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            border-style: solid;
+            transition: all 1s ease;
+            box-shadow: 0 0 10px var(--theme-color), inset 0 0 10px var(--theme-dim);
+        }
+        
+        .core-glow {
+            background: var(--theme-color);
+            box-shadow: 0 0 40px var(--theme-color), 0 0 80px var(--theme-color);
+            opacity: 0.9;
+            mix-blend-mode: screen;
+        }
+
+        @keyframes spin-cw { 100% { transform: translate(-50%, -50%) rotate(360deg); } }
+        @keyframes spin-ccw { 100% { transform: translate(-50%, -50%) rotate(-360deg); } }
+        @keyframes pulse { 0%, 100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); filter: brightness(1); } 50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); filter: brightness(1.5); } }
+
+        .shape-c0 .L1 { width: 100%; height: 100%; border-width: 4px; border-color: var(--theme-color) transparent; border-radius: 50%; animation: spin-cw 8s linear infinite; }
+        .shape-c0 .L2 { width: 80%; height: 80%; border-width: 2px; border-color: transparent var(--theme-color); border-radius: 50%; animation: spin-ccw 5s linear infinite; }
+        .shape-c0 .L3 { width: 60%; height: 60%; border-width: 6px; border-color: var(--theme-dim); border-radius: 50%; border-style: dotted; animation: spin-cw 20s linear infinite;}
+        .shape-c0 .L4 { width: 30%; height: 30%; border-radius: 50%; animation: pulse 2s ease-in-out infinite; }
+
+        .shape-c1 .L1 { width: 100%; height: 100%; border: 2px dashed var(--theme-color); border-radius: 50%; animation: spin-cw 20s linear infinite; box-shadow: 0 0 10px var(--theme-dim); }
+        .shape-c1 .L2 { width: 90%; height: 90%; border: 4px solid var(--theme-color); clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); animation: spin-ccw 5s linear infinite; opacity: 0.8; }
+        .shape-c1 .L3 { width: 70%; height: 70%; border: 1px solid var(--theme-color); background: linear-gradient(45deg, transparent 40%, var(--theme-dim) 50%, transparent 60%); animation: spin-cw 3s linear infinite; }
+        .shape-c1 .L4 { width: 40%; height: 40%; background: var(--theme-color); clip-path: polygon(20% 0%, 80% 0%, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0% 80%, 0% 20%); animation: pulse 2s infinite; opacity: 0.8; }
+
+        /* Phase 3: Void Gate (異なる太さの円弧と重なり) */
+        .shape-c2 .L1 { width: 100%; height: 100%; border: 6px solid transparent; border-top: 6px solid var(--theme-color); border-bottom: 6px solid var(--theme-color); border-radius: 50%; animation: spin-cw 4s linear infinite; box-shadow: 0 0 15px var(--theme-color); }
+        .shape-c2 .L2 { width: 85%; height: 85%; border: 2px solid var(--theme-dim); border-radius: 50%; border-left: 10px solid var(--theme-color); border-right: 10px solid var(--theme-color); animation: spin-ccw 8s ease-in-out infinite; }
+        .shape-c2 .L3 { width: 60%; height: 60%; border: 1px dashed var(--theme-color); border-radius: 50%; animation: spin-cw 10s linear infinite; }
+        .shape-c2 .L4 { width: 20%; height: 20%; background: var(--theme-color); border-radius: 50%; box-shadow: 0 0 20px var(--theme-color); animation: pulse 0.5s infinite alternate; }
+
+        /* Phase 4: Antimatter Shard (鋭利な破片と高速回転) */
+        .shape-c3 .L1 { width: 100%; height: 100%; border: 1px solid var(--theme-color); clip-path: polygon(50% 0%, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0% 50%, 40% 40%); animation: spin-cw 15s linear infinite; background: rgba(255,255,255,0.02); }
+        .shape-c3 .L2 { 
+            width: 100%; height: 100%; /* コンテナいっぱいに広げて中心座標(50%)を合わせる */
+            background: var(--theme-color); 
+            opacity: 1; /* 線を細くした分、クッキリ見えるように不透明度アップ */
+            /* 重心(50% 50%)を中心とした正三角形の座標。
+               外側半径: 48%, 内側半径: 47% (差分1%で極細ラインを実現)
+            */
+            clip-path: polygon(
+                /* 外側の三角形 */
+                50% 2%, 91.6% 74%, 8.4% 74%, 50% 2%, 
+                /* 内側の三角形 (頂点の順序を逆にして穴をあける) */
+                50% 3.5%, 9.7% 73.2%, 90.3% 73.2%, 50% 3.5%
+            );
+            animation: spin-cw 8s linear infinite; 
+            filter: drop-shadow(0 0 5px var(--theme-color)); 
+        }
+        .shape-c3 .L3 { 
+            width: 100%; height: 100%; 
+            background: var(--theme-color); 
+            opacity: 1;
+            /* L2と同じ座標 */
+            clip-path: polygon(
+                50% 2%, 91.6% 74%, 8.4% 74%, 50% 2%, 
+                50% 3.5%, 9.7% 73.2%, 90.3% 73.2%, 50% 3.5%
+            );
+            animation: spin-ccw 8s linear infinite; 
+            filter: drop-shadow(0 0 5px var(--theme-color));
+        }
+        .shape-c3 .L4 { width: 30%; height: 30%; border: 2px solid #fff; transform: rotate(45deg); animation: pulse 0.2s infinite; box-shadow: 0 0 30px var(--theme-color); background: var(--theme-color); }
+
+        /* Phase 5: Divine Tech (魔法陣のような幾何学模様) */
+        .shape-c4 .L1 { width: 100%; height: 100%; border: 1px solid var(--theme-dim); border-radius: 50%; box-shadow: inset 0 0 20px var(--theme-color); animation: spin-cw 60s linear infinite; }
+        .shape-c4 .L2 { width: 100%; height: 100%; border: 2px solid var(--theme-color); clip-path: polygon(0% 15%, 15% 15%, 15% 0%, 85% 0%, 85% 15%, 100% 15%, 100% 85%, 85% 85%, 85% 100%, 15% 100%, 15% 85%, 0% 85%); animation: spin-ccw 20s linear infinite; }
+        .shape-c4 .L3 { 
+            width: 65%; height: 65%; 
+            border: 2px solid var(--theme-color); 
+            background: radial-gradient(circle, transparent 30%, rgba(0, 247, 255, 0.2) 40%, transparent 60%);
+            /* 角を落とした八角形のような複雑な形状 */
+            clip-path: polygon(
+                30% 0%, 70% 0%, 100% 30%, 100% 70%, 
+                70% 100%, 30% 100%, 0% 70%, 0% 30%
+            );
+            /* ★修正点: translate(-50%, -50%) を明示して常に中心に固定 */
+            transform: translate(-50%, -50%);
+            animation: spin-cw 12s linear infinite;
+            box-shadow: 0 0 15px var(--theme-color), inset 0 0 10px var(--theme-color);
+        }
+        .shape-c4 .L4 { width: 40%; height: 40%; border: 1px solid #fff; border-radius: 50%; box-shadow: 0 0 10px var(--theme-color); animation: pulse 4s infinite; background: radial-gradient(circle, var(--theme-color), transparent); }
+
+        /* Phase 6: Cyber HUD (ターゲットスコープ) */
+        .shape-c5 .L1 { width: 100%; height: 100%; border: 2px solid var(--theme-color); border-radius: 50%; clip-path: polygon(0% 45%, 10% 45%, 10% 55%, 0% 55%, 0% 100%, 100% 100%, 100% 55%, 90% 55%, 90% 45%, 100% 45%, 100% 0%, 0% 0%); animation: spin-cw 10s ease-in-out infinite; }
+        .shape-c5 .L2 { width: 80%; height: 80%; border: 1px dashed var(--theme-color); border-radius: 50%; animation: spin-ccw 20s linear infinite; }
+        .shape-c5 .L3 { width: 90%; height: 90%; border-top: 20px solid transparent; border-bottom: 20px solid transparent; border-left: 4px solid var(--theme-color); border-right: 4px solid var(--theme-color); border-radius: 50%; animation: spin-cw 2s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite; }
+        .shape-c5 .L4 { width: 10%; height: 10%; background: #fff; border-radius: 50%; box-shadow: 0 0 20px #fff; animation: pulse 1s infinite; }
+
+        /* Phase 7: Plasma Reactor (エネルギー充填) */
+        .shape-c6 .L1 { width: 100%; height: 100%; border-radius: 50%; border: 2px dashed var(--theme-color); animation: spin-cw 20s linear infinite; opacity: 0.3; }
+        .shape-c6 .L2 { 
+            width: 100%; height: 100%; 
+            border-radius: 50%;
+            
+            background: 
+                /* 1層目（手前）: リング状のボディ */
+                /* ボディの幅を狭め(70%~82%)、外側の歯のためのスペース(82%~100%)を広く確保しました */
+                radial-gradient(transparent 70%, var(--theme-color) 71%, var(--theme-color) 82%, transparent 83%),
+                
+                /* 2層目（奥）: 歯車パターン (扇形のグラデーション) */
+                conic-gradient(
+                    from 0deg,
+                    var(--theme-color) 0deg 10deg, transparent 10deg 30deg,
+                    var(--theme-color) 30deg 40deg, transparent 40deg 60deg,
+                    var(--theme-color) 60deg 70deg, transparent 70deg 90deg,
+                    var(--theme-color) 90deg 100deg, transparent 100deg 120deg,
+                    var(--theme-color) 120deg 130deg, transparent 130deg 150deg,
+                    var(--theme-color) 150deg 160deg, transparent 160deg 180deg,
+                    var(--theme-color) 180deg 190deg, transparent 190deg 210deg,
+                    var(--theme-color) 210deg 220deg, transparent 220deg 240deg,
+                    var(--theme-color) 240deg 250deg, transparent 250deg 270deg,
+                    var(--theme-color) 270deg 280deg, transparent 280deg 300deg,
+                    var(--theme-color) 300deg 310deg, transparent 310deg 330deg,
+                    var(--theme-color) 330deg 340deg, transparent 340deg 360deg
+                );
+            
+            /* マスク: 中心の穴を広げ(60%)、内側の歯も短く鋭く見せる */
+            -webkit-mask: radial-gradient(transparent 60%, black 61%);
+            mask: radial-gradient(transparent 60%, black 61%);
+            
+            /* 動き: 重厚な回転 */
+            animation: spin-ccw 4s cubic-bezier(0.68, -0.6, 0.32, 1.6) infinite;
+            
+            filter: drop-shadow(0 0 5px var(--theme-color));
+        }
+        .shape-c6 .L3 { width: 70%; height: 70%; background: conic-gradient(from 0deg, transparent, var(--theme-dim), transparent); border-radius: 50%; animation: spin-cw 1s linear infinite; opacity: 0.8; }
+        .shape-c6 .L4 { width: 50%; height: 50%; background: radial-gradient(circle, #fff, var(--theme-color)); border-radius: 50%; animation: pulse 0.3s infinite; filter: blur(2px); }
+
+        /* Phase 8: Singularity (ブラックホールと降着円盤) */
+        .shape-c7 .L1 { width: 110%; height: 30%; border: 2px solid var(--theme-color); border-radius: 50%; animation: spin-cw 8s linear infinite; }
+        .shape-c7 .L2 { width: 30%; height: 110%; border: 2px solid var(--theme-color); border-radius: 50%; animation: spin-cw 8s linear infinite; }
+        .shape-c7 .L3 { width: 80%; height: 80%; border: 10px double var(--theme-dim); border-radius: 50%; animation: spin-ccw 20s linear infinite; box-shadow: inset 0 0 20px var(--theme-color); }
+        .shape-c7 .L4 { width: 25%; height: 25%; background: #000; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 30px var(--theme-color); animation: pulse 2s infinite; }
+
+        /* Phase 9: Angelic Ring (修正版：セラフィム・ジオメトリ) */
+        
+        /* L1: 外周の結界リング (途切れた光の輪) */
+        .shape-c8 .L1 { 
+            width: 100%; height: 100%; 
+            border: 2px solid var(--theme-color); 
+            border-radius: 50%; 
+            /* 上下左右の一部を透明にして、切れ込みを入れる */
+            border-top-color: transparent;
+            border-bottom-color: transparent;
+            box-shadow: 0 0 15px var(--theme-color), inset 0 0 15px var(--theme-color); 
+            animation: spin-cw 12s linear infinite; 
+        }
+
+        /* L2: 十二方向へ伸びる光の槍（幾何学的スパイク） */
+        .shape-c8 .L2 { 
+            width: 95%; height: 95%; 
+            background: conic-gradient(from 0deg, 
+                var(--theme-color) 0deg 2deg, transparent 2deg 30deg,
+                var(--theme-color) 30deg 32deg, transparent 32deg 60deg,
+                var(--theme-color) 60deg 62deg, transparent 62deg 90deg,
+                var(--theme-color) 90deg 92deg, transparent 92deg 120deg,
+                var(--theme-color) 120deg 122deg, transparent 122deg 150deg,
+                var(--theme-color) 150deg 152deg, transparent 152deg 180deg,
+                var(--theme-color) 180deg 182deg, transparent 182deg 210deg,
+                var(--theme-color) 210deg 212deg, transparent 212deg 240deg,
+                var(--theme-color) 240deg 242deg, transparent 242deg 270deg,
+                var(--theme-color) 270deg 272deg, transparent 272deg 300deg,
+                var(--theme-color) 300deg 302deg, transparent 302deg 330deg,
+                var(--theme-color) 330deg 332deg, transparent 332deg 360deg
+            );
+            /* 中心を大きくくり抜いてリング状にする */
+            -webkit-mask: radial-gradient(transparent 65%, black 66%);
+            mask: radial-gradient(transparent 65%, black 66%);
+            animation: spin-ccw 20s linear infinite;
+            filter: drop-shadow(0 0 8px var(--theme-color));
+            opacity: 0.8;
+        }
+
+        /* L3: 内部の幾何学模様 (八角形と内部円の融合) */
+        .shape-c8 .L3 { 
+            width: 65%; height: 65%; 
+            border: 2px solid var(--theme-color);
+            /* 八角形（オクタゴン）に切り抜く */
+            clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+            /* 内部にうっすらと魔法陣のような円を描く */
+            background: radial-gradient(transparent 55%, var(--theme-color) 56%, transparent 58%);
+            animation: spin-cw 6s ease-in-out infinite;
+            box-shadow: 0 0 15px var(--theme-color);
+        }
+
+        /* L4: 神核 (Core) - 強烈な輝き */
+        .shape-c8 .L4 { 
+            width: 25%; height: 25%; 
+            background: #fff; 
+            border-radius: 50%; 
+            box-shadow: 0 0 60px #fff, 0 0 20px var(--theme-color); 
+            animation: pulse 1.5s infinite; 
+        }
+
+        /* Phase 10: Eternal Void (集大成：アポカリプス・コア) - 全要素の混沌融合 */
+        
+        /* L1: 最外層 - 崩壊する結界リングと魔法陣の残骸 */
+        .shape-c9 .L1 {
+            width: 100%; height: 100%;
+            border: 2px dashed var(--theme-color);
+            border-radius: 50%;
+            /* 複数のリングが重なり、一部が欠けている複雑な層 */
+            background: 
+                radial-gradient(transparent 60%, var(--theme-dim) 61%, var(--theme-dim) 64%, transparent 65%), /* 内側の薄いリング */
+                conic-gradient(from 0deg, transparent 0deg 240deg, var(--theme-color) 240deg 360deg); /* 部分的な光の弧 */
+            mask: radial-gradient(transparent 58%, black 59%);
+            -webkit-mask: radial-gradient(transparent 58%, black 59%);
+            animation: spin-cw 30s linear infinite; /* ゆっくりとした雄大な回転 */
+            box-shadow: 0 0 40px var(--theme-dim), inset 0 0 20px var(--theme-dim);
+            filter: drop-shadow(0 0 15px var(--theme-color));
+        }
+
+        /* L2: 外層 - 高速回転する光刃の嵐 (手裏剣要素の強化版) */
+        .shape-c9 .L2 {
+            width: 88%; height: 88%;
+            /* 鋭利な複数の刃が回転するイメージのグラデーション */
+            background: conic-gradient(
+                from 0deg,
+                var(--theme-color) 0deg 2deg, transparent 2deg 30deg, /* 細く鋭い刃 */
+                var(--theme-color) 30deg 35deg, transparent 35deg 60deg, /* 少し太い刃 */
+                var(--theme-color) 60deg 62deg, transparent 62deg 90deg,
+                var(--theme-color) 90deg 95deg, transparent 95deg 120deg,
+                var(--theme-color) 120deg 122deg, transparent 122deg 150deg,
+                var(--theme-color) 150deg 155deg, transparent 155deg 180deg,
+                var(--theme-color) 180deg 182deg, transparent 182deg 210deg,
+                var(--theme-color) 210deg 215deg, transparent 215deg 240deg,
+                var(--theme-color) 240deg 242deg, transparent 242deg 270deg,
+                var(--theme-color) 270deg 275deg, transparent 275deg 300deg,
+                var(--theme-color) 300deg 302deg, transparent 302deg 330deg,
+                var(--theme-color) 330deg 335deg, transparent 335deg 360deg
+            );
+            /* 複雑な多角形で切り抜いて攻撃的なフォルムに */
+            clip-path: polygon(50% 0%, 65% 35%, 100% 50%, 65% 65%, 50% 100%, 35% 65%, 0% 50%, 35% 35%);
+            animation: spin-ccw 2.5s linear infinite; /* 高速逆回転 */
+            opacity: 0.9;
+            filter: drop-shadow(0 0 10px var(--theme-color));
+        }
+
+        /* L3: 中層 - 重厚な機械構造と歯車 (メカニカル要素の融合) */
+        .shape-c9 .L3 {
+            width: 72%; height: 72%;
+            border-radius: 50%;
+            /* 複雑な歯車と機械的なパターン */
+            background: 
+                radial-gradient(transparent 35%, var(--theme-dim) 36%, var(--theme-color) 50%, transparent 51%), /* ボディ */
+                conic-gradient( /* 歯 */
+                    from 15deg, 
+                    var(--theme-dim) 0deg 10deg, transparent 10deg 30deg, 
+                    var(--theme-dim) 30deg 40deg, transparent 40deg 60deg,
+                    var(--theme-dim) 60deg 70deg, transparent 70deg 90deg,
+                    var(--theme-dim) 90deg 100deg, transparent 100deg 120deg,
+                    var(--theme-dim) 120deg 130deg, transparent 130deg 150deg,
+                    var(--theme-dim) 150deg 160deg, transparent 160deg 180deg,
+                    var(--theme-dim) 180deg 190deg, transparent 190deg 210deg,
+                    var(--theme-dim) 210deg 220deg, transparent 220deg 240deg,
+                    var(--theme-dim) 240deg 250deg, transparent 250deg 270deg,
+                    var(--theme-dim) 270deg 280deg, transparent 280deg 300deg,
+                    var(--theme-dim) 300deg 310deg, transparent 310deg 330deg,
+                    var(--theme-dim) 330deg 340deg, transparent 340deg 360deg
+                );
+            mask: radial-gradient(transparent 28%, black 29%);
+            -webkit-mask: radial-gradient(transparent 28%, black 29%);
+            animation: spin-cw 7s cubic-bezier(0.7, -0.5, 0.3, 1.5) infinite; /* 重量感のある弾性回転 */
+            filter: drop-shadow(0 0 8px var(--theme-dim));
+            opacity: 0.8;
+        }
+
+        /* L4: 内層 - 融合する幾何学コア (複数の形状が重なり合う) */
+        .shape-c9 .L4 {
+            width: 50%; height: 50%;
+            background: linear-gradient(45deg, var(--theme-color), #fff);
+            /* 六角形、十字、菱形が融合したような複雑なクリスタル形状 */
+            clip-path: polygon(
+                50% 0%, 80% 20%, 100% 50%, 80% 80%, 
+                50% 100%, 20% 80%, 0% 50%, 20% 20%,
+                50% 10%, 90% 50%, 50% 90%, 10% 50% /* 内部の十字ライン */
+            );
+            animation: spin-ccw 5s linear infinite, pulse 1.2s ease-in-out infinite alternate;
+            opacity: 0.95;
+            box-shadow: 0 0 30px var(--theme-color), inset 0 0 30px #fff;
+        }
+
+        /* L5: 中心核 - 終焉の特異点 (新規追加レイヤー) */
+        .shape-c9 .L5 {
+            position: absolute; /* 中央に配置 */
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 18%; height: 18%;
+            background: #fff; /* 純白のエネルギー体 */
+            border-radius: 50%;
+            /* 強烈な発光エフェクト */
+            box-shadow: 
+                0 0 60px #fff,
+                0 0 120px var(--theme-color),
+                0 0 200px var(--theme-color),
+                inset 0 0 30px var(--theme-color);
+            /* 激しい明滅と回転 */
+            animation: pulse 0.2s ease-in-out infinite alternate, spin-cw 0.5s linear infinite;
+            z-index: 10; /* 最前面に表示 */
+        }
+
+        /* Phase 11: Cosmic Horror (修正版V3：這いよる侵食と虚無の玉座) */
+
+        /* 新規アニメーション：這いよるようにゆっくりと拡大縮小・回転する動き */
+        @keyframes creep-grow {
+            0% { transform: translate(-50%, -50%) scale(1) rotate(0deg); border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; }
+            50% { transform: translate(-50%, -50%) scale(1.4) rotate(180deg); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+            100% { transform: translate(-50%, -50%) scale(1.2) rotate(360deg); border-radius: 50% 50% 40% 60% / 50% 40% 60% 50%;}
+        }
+        /* 核の歪みアニメーション */
+        @keyframes core-morph {
+            0% { border-radius: 50% 50% 50% 50% / 50% 50% 50% 50%; }
+            33% { border-radius: 70% 40% 30% 80% / 70% 30% 80% 40%; }
+            66% { border-radius: 40% 70% 80% 30% / 30% 70% 40% 80%; }
+            100% { border-radius: 50% 50% 50% 50% / 50% 50% 50% 50%; }
+        }
+        /* 時空の裂けめアニメーション */
+        @keyframes core-morphs {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        /* 触手用アニメーション：軟体動物のような有機的な動き */
+        @keyframes slime-writhe {
+            0% { transform: translate(-50%, -50%) rotate(0deg) scale(1); }
+            25% { transform: translate(-50%, -50%) rotate(10deg) scale(1.05, 0.95); }
+            50% { transform: translate(-50%, -50%) rotate(0deg) scale(0.95, 1.05); }
+            75% { transform: translate(-50%, -50%) rotate(-10deg) scale(1.05, 0.95); }
+            100% { transform: translate(-50%, -50%) rotate(0deg) scale(1); }
+        }
+        
+        /* L1: 【最重要】画面全体を侵食し、モジュールに覆いかぶさる巨大な触手の影 */
+        .shape-c10 .L1 { 
+            position: fixed; /* リアクターの枠を無視して画面に固定 */
+            top: 50%; left: 50%;
+            /* 画面の長辺の2倍という超巨大サイズで覆い尽くす */
+            width: 200vmax; height: 200vmax;
+            /* 禍々しい暗黒と紫の触手のようなグラデーション */
+            background: radial-gradient(circle at center, transparent 20%, var(--theme-dim) 40%, #000 70%, var(--theme-color) 90%);
+            /* 不定形にうねるマスク */
+            border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+            /* 這いよるアニメーション */
+            animation: creep-grow 60s linear infinite alternate;
+            /* ★重要★ モジュールパネルより手前に表示するが、クリックは透過させる */
+            z-index: 90; 
+            pointer-events: none;
+            opacity: 0.85;
+            filter: blur(30px) contrast(150%); /* 輪郭を大きくぼかして恐怖感を煽る */
+        }
+        
+        /* L2〜L5は、巨大な背景(L1)の上に、リアクターの位置で輝くように z-index を調整 */
+
+        /* L2: 狂気の渦 (空間の歪み) */
+        .shape-c10 .L2 { 
+            width: 120%; height: 120%; 
+            background: repeating-conic-gradient(from 0deg, transparent 0deg 10deg, var(--theme-dim) 10deg 20deg, transparent 20deg 40deg);
+            border-radius: 50%;
+            mask: radial-gradient(transparent 50%, black 55%);
+            -webkit-mask: radial-gradient(transparent 50%, black 55%);
+            animation: spin-ccw 20s linear infinite; 
+            opacity: 0.6;
+            z-index: 91; /* L1より上 */
+            pointer-events: none;
+            animation: slime-writhe 4s ease-in-out infinite;
+            filter: brightness(200%);
+        }
+
+        /* L3: 虚空の裂け目 */
+        .shape-c10 .L3 { 
+            width: 90%; height: 90%; 
+            border: 3px dashed rgba(255, 255, 255, 0.5);
+            border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+            animation: morph-spin 8s ease-in-out infinite reverse;
+            box-shadow: 0 0 30px var(--theme-color), inset 0 0 30px var(--theme-color);
+            z-index: 92;
+            pointer-events: none;
+            animation: core-morphs 5s ease-in-out infinite;
+            filter: brightness(200%);
+        }
+
+        /* L4: 事象の地平線 (吸い込まれる暗黒) */
+        .shape-c10 .L4 { 
+            width: 60%; height: 60%; 
+            background: #000; 
+            border-radius: 50%; 
+            box-shadow: 0 0 80px var(--theme-color), inset 0 0 50px #fff; 
+            animation: pulse 3s ease-in-out infinite; 
+            z-index: 93;
+            pointer-events: none;
+        }
+
+        /* L5: 【核】 沸騰する「虚無の玉座」 (アザトース) */
+        .shape-c10 .L5 {
+            width: 25%; height: 40%;
+            position: absolute;
+            background: radial-gradient(circle at 30% 30%, #fff, var(--theme-color));
+            box-shadow: 0 0 60px var(--theme-color);
+            z-index: 6;
+            /* 瞳も歪ませる */
+            animation: core-morph 2.5s ease-in-out infinite;
+            filter: brightness(200%);
+        }
+
+        /* 歪みアニメーション用キーフレーム（CSSの最後の方に追加してもOK） */
+        @keyframes morph-spin {
+            0% { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; transform: translate(-50%, -50%) rotate(0deg); }
+            100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        h2 { font-size: 1rem; color: var(--theme-color); border-bottom: 1px solid var(--theme-dim); padding-bottom: 5px; margin: 0 0 10px 0; text-shadow: 0 0 8px var(--theme-color); transition: 1s; }
+        
+        .btn-upgrade, .artifact-card, .challenge-card, .unique-card {
+            width: 100%; background: linear-gradient(90deg, rgba(255,255,255, 0.05), transparent);
+            border: 1px solid var(--theme-dim); color: var(--text); padding: 10px; margin-bottom: 6px; 
+            display: flex; flex-direction: column; gap: 4px; transition: all 0.2s; position: relative; font-family: 'Roboto Mono', monospace;
+        }
+        .clickable:hover:not(:disabled) { background: rgba(255,255,255, 0.15); border-color: var(--theme-color); box-shadow: 0 0 10px var(--theme-dim); }
+        .clickable:active:not(:disabled) { transform: translateY(1px); }
+        .clickable:disabled { opacity: 0.4; cursor: not-allowed; border-color: #333; filter: grayscale(1); }
+
+        .artifact-card.normal { border-left: 3px solid var(--rare); }
+        .unique-card { border-left: 3px solid var(--unique); }
+        .artifact-card.ether { border-left: 3px solid var(--ether); box-shadow: 0 0 5px rgba(255,255,255,0.1); background: linear-gradient(90deg, rgba(255,255,255, 0.1), transparent); }
+        
+        .unique-card.purchased, .artifact-card.purchased { border-color: #333; opacity: 0.5; cursor: default; }
+        .unique-card.purchased::after, .artifact-card.purchased::after {
+            content: "ACQUIRED"; position: absolute; top: 50%; left: 50%; 
+            transform: translate(-50%, -50%) rotate(-10deg);
+            border: 2px solid var(--unique); color: var(--unique); 
+            padding: 5px 10px; font-weight: bold; font-family: 'Orbitron'; opacity: 0.8;
+            box-shadow: 0 0 10px var(--unique), inset 0 0 10px var(--unique);
+        }
+
+        .challenge-header { font-family: 'Orbitron'; font-size: 0.8rem; color: var(--theme-color); margin-top: 15px; margin-bottom: 5px; border-bottom: 1px dashed #444; padding-bottom: 2px; text-shadow: 0 0 5px var(--theme-color); }
+        .challenge-card { border-left: 3px solid #555; cursor: default; background: rgba(0,0,0,0.3); }
+        .challenge-card.claimable { border-left-color: var(--boost); background: rgba(255, 136, 0, 0.15); box-shadow: inset 0 0 15px rgba(255,136,0,0.1); }
+        .challenge-card.completed { border-left-color: var(--unique); background: rgba(0, 255, 0, 0.05); }
+
+        .claim-btn, .special-btn { background: var(--boost); color: #000; border: none; padding: 6px 10px; font-weight: bold; cursor: pointer; font-family: 'Orbitron'; font-size: 0.8rem; width: 100%; margin-top: 5px; border-radius: 2px; box-shadow: 0 0 10px var(--boost); transition: all 0.2s; }
+        .claim-btn:hover, .special-btn:hover { background: #ffaa33; box-shadow: 0 0 20px var(--boost); filter: brightness(1.2); }
+        .special-btn { background: var(--unique); box-shadow: 0 0 10px var(--unique); }
+        .special-btn:hover { background: #55ff55; box-shadow: 0 0 20px var(--unique); }
+
+        #btn-buy-all-max { margin-bottom: 15px; }
+
+        .auto-buy-wrapper { position: absolute; right: 10px; top: 35px; z-index: 5; display: flex; align-items: center; gap: 5px; }
+        .toggle-label { font-size: 0.7rem; color: #aaa; }
+        .toggle-switch { position: relative; width: 30px; height: 16px; background: #333; border-radius: 8px; cursor: pointer; transition: 0.3s; box-shadow: inset 0 0 5px #000; }
+        .toggle-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; background: #fff; border-radius: 50%; transition: 0.3s; box-shadow: 0 0 5px #fff; }
+        .toggle-switch.active { background: var(--unique); box-shadow: 0 0 10px var(--unique); }
+        .toggle-switch.active::after { transform: translateX(14px); }
+
+        .buy-controls { display: flex; gap: 5px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--theme-dim); }
+        .buy-btn { flex: 1; background: rgba(0,0,0,0.3); border: 1px solid var(--theme-dim); color: var(--text); padding: 4px; cursor: pointer; font-family: 'Orbitron'; font-size: 0.8rem; text-align: center; transition: 0.2s; display: none; opacity: 0.3; }
+        .buy-btn.unlocked { display: block; opacity: 0.6; }
+        .buy-btn.unlocked:hover { opacity: 1; text-shadow: 0 0 5px currentColor;}
+        .buy-btn.active { background: var(--theme-dim); color: #fff; border-color: var(--theme-color); opacity: 1; box-shadow: 0 0 10px var(--theme-dim); }
+
+        .btn-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        .item-name { font-weight: bold; color: #fff; font-size: 0.9rem; text-shadow: 0 0 3px currentColor; }
+        .cost-text { color: var(--gold); font-weight: bold; font-family: 'Orbitron'; font-size: 0.85rem; text-shadow: 0 0 3px var(--gold); }
+        .relic-text { color: var(--rare); font-weight: bold; text-shadow: 0 0 5px var(--rare); }
+        .ether-text { color: var(--ether); font-weight: bold; text-shadow: 0 0 8px #fff; }
+        .effect-row { font-size: 0.75rem; color: #aaa; margin-top: 2px; display: flex; align-items: center; gap: 5px; }
+        .val-curr { color: var(--text); }
+        .val-next { color: var(--theme-color); font-weight: bold; text-shadow: 0 0 3px var(--theme-color); }
+
+        .tab-menu { display: flex; margin-bottom: 10px; gap: 5px; }
+        .tab-btn { flex: 1; background: transparent; border: 1px solid var(--theme-dim); color: var(--text); padding: 5px; cursor: pointer; font-family: 'Orbitron'; font-size: 0.7rem; transition: 0.3s; opacity: 0.6; }
+        .tab-btn:hover { opacity: 1; border-color: var(--theme-color); box-shadow: 0 0 5px var(--theme-dim); }
+        .tab-btn.active { background: var(--theme-dim); color: #fff; opacity: 1; box-shadow: 0 0 10px var(--theme-dim); border-color: var(--theme-color); }
+
+        #btn-prestige { background: linear-gradient(135deg, #220011, #440022); border: 1px solid var(--accent); margin-top: 10px; padding: 15px; text-align: center; width: 100%; color: #fff; cursor: pointer; box-shadow: 0 0 15px var(--accent); transition: all 0.3s; }
+        #btn-prestige:hover:not(:disabled) { 
+            background: linear-gradient(135deg, #440022, #660033); 
+            box-shadow: 0 0 30px var(--accent); 
+            filter: brightness(1.2);
+        }
+        #btn-prestige:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; filter: grayscale(1); }
+
+        #btn-transcend { background: linear-gradient(135deg, #111, #333); border: 1px solid #fff; color: #fff; margin-top: 20px; padding: 15px; text-align: center; width: 100%; cursor: pointer; box-shadow: 0 0 15px #fff; display: none; transition: all 0.3s; }
+        #btn-transcend:hover:not(:disabled) { 
+            background: #222; box-shadow: 0 0 30px #fff; 
+            filter: brightness(1.2); 
+        }
+        #btn-transcend:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+
+        #btn-apotheosis { 
+            background: linear-gradient(135deg, #002233, #004455); 
+            border: 2px solid var(--god); 
+            color: var(--god); 
+            margin-top: 20px; 
+            padding: 15px; 
+            text-align: center; 
+            width: 100%; 
+            cursor: pointer; 
+            box-shadow: 0 0 20px var(--god), inset 0 0 20px rgba(0,255,255,0.2); 
+            display: none; 
+            transition: all 0.5s; 
+            position: relative;
+            overflow: hidden;
+        }
+        #btn-apotheosis::before {
+            content: ''; position: absolute; top:-50%; left:-50%; width:200%; height:200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.2), transparent 70%);
+            transform: scale(0); transition: transform 0.5s;
+        }
+        #btn-apotheosis:hover:not(:disabled)::before { transform: scale(1); }
+        #btn-apotheosis:hover:not(:disabled) { 
+            background: #005566; box-shadow: 0 0 40px var(--god); 
+            filter: brightness(1.2); color: #fff; text-shadow: 0 0 10px var(--god);
+        }
+        #btn-apotheosis:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; filter: grayscale(1); border-color: #555; color: #aaa; }
+
+
+        .floater { position: absolute; color: #fff; font-weight: bold; pointer-events: none; animation: floatUp 0.8s ease-out forwards; font-family: 'Orbitron'; text-shadow: 0 0 10px var(--theme-color), 0 0 20px var(--theme-color); font-size: 1.1rem; }
+        @keyframes floatUp { 0% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-60px) scale(1.2); } }
+
+        #settings-icon { position: fixed; bottom: 20px; right: 20px; width: 45px; height: 45px; background: rgba(0,0,0,0.9); border: 2px solid var(--theme-color); border-radius: 50%; color: var(--theme-color); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: pointer; z-index: 200; box-shadow: 0 0 15px var(--theme-color); transition: 0.3s; }
+        #settings-icon:hover { transform: rotate(90deg); box-shadow: 0 0 25px var(--theme-color); }
+
+        #modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 300; display: none; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
+        
+        .modal-content { 
+            background: rgba(10, 15, 25, 0.95); 
+            border: 1px solid var(--theme-color); 
+            box-shadow: 0 0 50px var(--theme-dim); 
+            width: 800px; 
+            max-width: 95vw;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 25px; 
+            position: relative; 
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .settings-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .settings-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .modal-close { position: absolute; top: 15px; right: 20px; font-size: 1.8rem; cursor: pointer; color: var(--theme-color); z-index: 10;}
+
+        .setting-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px dashed #333; }
+        .setting-label { color: #fff; font-size: 0.9rem; }
+        .setting-control select, .setting-control input { background: #111; color: #fff; border: 1px solid var(--theme-dim); padding: 4px; font-family: 'Roboto Mono'; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #050505; }
+        ::-webkit-scrollbar-thumb { background: var(--theme-dim); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--theme-color); }
+    </style>
+</head>
+<body>
+    <div id="bg-grid"></div>
+    <div id="bg-glow"></div>
+    <canvas id="particleCanvas"></canvas>
+
+    <div id="skin-btn" style="position: fixed; bottom: 20px; right: 75px; width: 45px; height: 45px; background: rgba(0,0,0,0.9); border: 2px solid var(--theme-color); border-radius: 50%; color: var(--theme-color); display: none; align-items: center; justify-content: center; font-size: 1.5rem; cursor: pointer; z-index: 200; box-shadow: 0 0 15px var(--theme-color); transition: 0.3s;" onclick="toggleSkinModal(document.getElementById('skin-modal').style.display !== 'flex')">🎨</div>
+    <div id="settings-icon" onclick="toggleModal(true)">⚙</div>
+    <div id="modal-overlay" onclick="if(event.target === this) toggleModal(false)">
+        <div class="modal-content">
+            <div class="modal-close" onclick="toggleModal(false)">×</div>
+            
+            <div class="settings-container">
+                <div class="settings-col">
+                    <h3 id="ui-graphics-title" style="color:var(--theme-color); border-bottom:1px solid #333; padding-bottom:5px; margin-top:0;">GRAPHICS SETTINGS</h3>
+                    
+                    <div class="setting-row">
+                        <span class="setting-label" id="ui-label-particles">パーティクル量</span>
+                        <div class="setting-control">
+                            <select id="set-particles" onchange="updateGraphics('particles', this.value)">
+                                <option value="high">High</option>
+                                <option value="med">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label" id="ui-label-bloom">Bloom効果</span>
+                        <div class="setting-control">
+                            <label style="color:#aaa;"><input type="checkbox" id="set-bloom" onchange="updateGraphics('bloom', this.checked)"> Enable</label>
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label" id="ui-label-blur">Blur効果</span>
+                        <div class="setting-control">
+                            <label style="color:#aaa;"><input type="checkbox" id="set-blur" onchange="updateGraphics('blur', this.checked)"> Enable</label>
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label" id="ui-label-bgcolor">背景カラー</span>
+                        <div class="setting-control">
+                            <label style="color:#aaa;"><input type="checkbox" id="set-bg-color" onchange="updateGraphics('bgColor', this.checked)"> Enable</label>
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label" id="ui-label-numbers">ダメージ数値</span>
+                        <div class="setting-control">
+                            <label style="color:#aaa;"><input type="checkbox" id="set-numbers" onchange="updateGraphics('numbers', this.checked)"> Enable</label>
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label" id="ui-label-confirm">リセット確認</span>
+                        <div class="setting-control">
+                            <label style="color:#aaa;"><input type="checkbox" id="set-confirm" onchange="updateGraphics('confirmations', this.checked)"> Enable</label>
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label" id="ui-label-lang">言語設定 / LANGUAGE</span>
+                        <div class="setting-control">
+                            <select id="set-lang" onchange="updateGraphics('lang', this.value)">
+                                <option value="ja">日本語</option>
+                                <option value="en">English</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-col">
+                    <h3 id="ui-data-title" style="color:var(--theme-color); border-bottom:1px solid #333; padding-bottom:5px; margin-top:0;">DATA MANAGEMENT</h3>
+                    <div style="display:flex; gap:10px; margin-bottom:20px;">
+                        <button class="btn-upgrade clickable" onclick="exportSave()" style="border-color:var(--theme-color); color:var(--theme-color); text-align:center;">
+                            📤 EXPORT
+                        </button>
+                        <button class="btn-upgrade clickable" onclick="importSave()" style="border-color:var(--gold); color:var(--gold); text-align:center;">
+                            📥 IMPORT
+                        </button>
+                    </div>
+
+                    <h3 id="ui-system-title" style="color:var(--theme-color); border-bottom:1px solid #333; padding-bottom:5px;">SYSTEM</h3>
+                    <p id="ui-save-desc" style="font-size:0.9rem; margin-bottom:10px;">ゲームの進行状況を保存します。</p>
+                    <button id="btn-manual-save" class="btn-upgrade clickable" onclick="manualSave()" style="border-color:var(--unique); color:var(--unique); text-align:center; margin-bottom:20px; box-shadow: 0 0 10px var(--unique);">
+                        💾 SAVE GAME
+                    </button>
+                    <p id="ui-reset-desc" style="font-size:0.9rem; margin-top:20px; border-top:1px solid #333; padding-top:15px; margin-bottom:10px;">ゲームデータをリセットしますか？</p>
+                    <button id="ui-btn-delete" class="btn-upgrade clickable" onclick="resetSave()" style="border-color:#f55; color:#f55; text-align:center; box-shadow: 0 0 10px #f55;">
+                        ⚠ DELETE SAVE DATA
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="skin-modal" class="modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: transparent; z-index: 300; display: none; align-items: center; justify-content: flex-end; pointer-events: none;" onclick="if(event.target === this) toggleSkinModal(false)">
+        <div class="modal-content" style="width: 320px; margin-right: 30px; pointer-events: auto; box-shadow: 0 0 30px rgba(0,0,0,1); background-color: #0a0f19 !important; backdrop-filter: none !important; opacity: 1 !important;">
+            <h2 class="tech-font" id="skin-menu-title">SKIN MENU</h2>
+            
+            <div id="manual-skin-controls" style="margin-top:10px;">
+                <div class="setting-row">
+                    <span class="setting-label" id="skin-label-color">COLOR</span>
+                    <div class="setting-control">
+                        <select id="skin-color-select" onchange="updateManualSkin()" style="background:#111; color:#fff; border:1px solid var(--theme-dim); padding:4px; font-family:'Roboto Mono';"></select>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label" id="skin-label-shape">SHAPE</span>
+                    <div class="setting-control">
+                        <select id="skin-shape-select" onchange="updateManualSkin()" style="background:#111; color:#fff; border:1px solid var(--theme-dim); padding:4px; font-family:'Roboto Mono';"></select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="game-layout">
+        <div class="sidebar">
+            <h2 id="ui-module-header">>> MODULES</h2>
+            <button id="btn-buy-all-max" class="special-btn" style="display:none;" onclick="buyAllModulesMax()">
+                >> BUY ALL MAX
+            </button>
+
+            <div class="buy-controls">
+                <div id="btn-buy-1" class="buy-btn unlocked active" onclick="setBuyMode(1)">x1</div>
+                <div id="btn-buy-5" class="buy-btn" onclick="setBuyMode(5)">x5</div>
+                <div id="btn-buy-10" class="buy-btn" onclick="setBuyMode(10)">x10</div>
+                <div id="btn-buy-max" class="buy-btn" onclick="setBuyMode(-1)">MAX</div>
+            </div>
+            <div id="upgrade-list" class="scroll-area"></div>
+        </div>
+
+        <div id="center-stage">
+            <div id="header-stats">
+                <div id="score-display">0</div>
+                <div id="header-relic-display" style="display:none;">💎 0</div>
+                <div id="mps-display">0 / sec</div>
+            </div>
+
+            <div id="reactor-wrapper" class="shape-c0">
+                <div class="r-layer L1"></div>
+                <div class="r-layer L2"></div>
+                <div class="r-layer L3"></div>
+                <div class="r-layer L4 core-glow"></div>
+                <div class="r-layer L5"></div>
+            </div>
+
+            <div class="phase-container">
+                <span id="stage-badge">Phase 1</span>
+                <div id="stage-progress-bg"><div id="stage-progress-fill"></div></div>
+                <div id="stage-req-text">Next: 3.00M</div>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="tab-menu">
+                <button id="ui-tab-system" class="tab-btn active" onclick="switchTab('system', this)">SYSTEM</button>
+                <button id="tab-btn-artifacts" class="tab-btn" onclick="switchTab('artifacts', this)" style="display:none;">ARTIFACTS</button>
+                <button id="ui-tab-challenges" class="tab-btn" onclick="switchTab('challenges', this)">CHALLENGES</button>
+                <button id="tab-btn-transcend" class="tab-btn" onclick="switchTab('transcend', this)" style="color:var(--ether); display:none;">TRANSCEND</button>
+            </div>
+
+            <div id="tab-system" class="scroll-area tab-content">
+                <div style="padding:10px; background:rgba(0,0,0,0.3); border:1px solid var(--theme-dim); font-size:0.9rem; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);">
+                    <div><span id="ui-label-mult">倍率</span>: <span id="current-mult" style="color:var(--theme-color)">x1.00</span></div>
+                    <div><span id="ui-label-bonus">生産ボーナス</span>: <span id="sys-chal-bonus" style="color:var(--gold)">+0%</span></div>
+                    
+                    <div id="stat-row-relic" style="display:none;"><span id="ui-label-relic">レリック</span>: <span id="relic-count" class="relic-text">0</span></div>
+                    <div id="stat-row-ether" style="display:none;"><span id="ui-label-ether">エーテル</span>: <span id="ether-count" class="ether-text">0</span></div>
+                    
+                    <div style="margin-top:5px; border-top:1px dashed #444; padding-top:5px;"></div>
+                    <div><span id="ui-label-clicks">累計クリック</span>: <span id="stat-clicks">0</span></div>
+                    
+                    <div id="stat-row-prestige" style="display:none;"><span id="ui-label-prestige-count">転生回数</span>: <span id="sys-prestige">0</span></div>
+                    <div id="stat-row-transcend" style="display:none;"><span id="ui-label-transcend-count">超越回数</span>: <span id="sys-transcend">0</span></div>
+                    <div id="stat-row-apotheosis" style="display:none;"><span id="ui-label-apotheosis-count">真化回数</span>: <span id="sys-apotheosis" style="color:var(--god); font-weight:bold;">0</span></div>
+                    
+                    <div><span id="ui-label-online">オンライン時間</span>: <span id="sys-time">00:00:00</span></div>
+                </div>
+                <button id="btn-prestige" onclick="tryPrestige()">
+                    <div class="tech-font" style="font-size:1.1rem; margin-bottom:5px;">DIMENSION RESET</div>
+                    <div id="ui-prestige-desc" style="font-size:0.8rem; color:#ffaab9;">進行リセット / レリック獲得</div>
+                    <div id="prestige-gain" style="font-size:1rem; font-weight:bold; margin-top:5px; text-shadow:0 0 5px #ff55aa;">+0 Relics</div>
+                </button>
+
+                <button id="btn-transcend" onclick="tryTranscend()">
+                    <div class="tech-font" style="font-size:1.2rem;">TRANSCENDENCE</div>
+                    <div id="ui-transcend-desc" style="font-size:0.75rem; color:#aaa; margin-top:5px;">
+                        全てをリセットし、上位次元へ到達する。<br>
+                        アーティファクト、モジュール、進行度は失われます。
+                    </div>
+                    <div id="transcend-req" style="margin-top:10px; font-weight:bold; color:#f55; text-shadow:0 0 5px #f00;">REQ: 50,000 Relics</div>
+                    <div id="transcend-gain" style="color:var(--ether); font-weight:bold; text-shadow:0 0 10px #fff;">GAIN: +1 Ether</div>
+                </button>
+
+                <button id="btn-apotheosis" onclick="tryApotheosis()">
+                    <div class="tech-font" style="font-size:1.3rem;">APOTHEOSIS</div>
+                    <div id="ui-apotheosis-desc" style="font-size:0.75rem; color:#acf; margin-top:5px;">
+                        次元の枠組みを超越し、神性領域へ。<br>
+                        エーテル、超越アーティファクトを含む全てをリセット。
+                    </div>
+                    <div id="apotheosis-req" style="margin-top:10px; font-weight:bold; color:#f55; text-shadow:0 0 5px #f00;">REQ: Phase 20</div>
+                    <div id="apotheosis-gain" style="color:var(--god); font-weight:bold; text-shadow:0 0 10px var(--god);">NEXT: Relic/Ether x2</div>
+                </button>
+            </div>
+
+            <div id="tab-artifacts" class="scroll-area tab-content" style="display:none;">
+                <div style="margin-bottom:10px; color:var(--rare); font-size:0.9rem; text-align:right;">
+                    Relics: <span id="artifact-relic-display">0</span>
+                </div>
+                <h3 id="ui-unique-header" style="color:var(--unique); font-size:0.9rem; border-bottom:1px dashed var(--unique); margin:15px 0 5px 0;">>> SYSTEM UPGRADES (Unique)</h3>
+                <div id="unique-list"></div>
+                <h3 id="ui-standard-header" style="color:var(--rare); font-size:0.9rem; border-bottom:1px dashed var(--rare); margin:15px 0 5px 0;">>> STANDARD ARTIFACTS</h3>
+                <div id="artifact-list"></div>
+            </div>
+
+            <div id="tab-challenges" class="scroll-area tab-content" style="display:none;">
+                <div style="margin-bottom:10px; padding:10px; background:rgba(0,0,0,0.3); border:1px solid var(--theme-dim); font-size:0.85rem; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);">
+                    <div><span id="ui-label-global-bonus">グローバル生産ボーナス</span>: <span id="chal-total-bonus" style="color:var(--gold); font-weight:bold; text-shadow: 0 0 5px var(--gold);">+0%</span></div>
+                    <div id="ui-chal-note" style="font-size:0.75rem; color:#aaa; margin-top:4px;">(※モジュール個別強化は含まれません)</div>
+                </div>
+                <button id="btn-claim-all" class="special-btn" style="display:none; margin-bottom:15px;" onclick="claimAllChallenges()">
+                    CLAIM ALL REWARDS
+                </button>
+                <div id="challenge-list"></div>
+            </div>
+
+            <div id="tab-transcend" class="scroll-area tab-content" style="display:none;">
+                <div style="text-align:center; margin-bottom:15px; padding:10px; background:rgba(255,255,255,0.05); border:1px solid #fff; box-shadow: 0 0 15px rgba(255,255,255,0.2);">
+                    <div style="font-size:0.8rem;">ETHEREAL ENERGY</div>
+                    <div id="ether-display" class="ether-text" style="font-size:1.5rem;">0</div>
+                </div>
+                <h3 id="ui-advanced-header" style="color:var(--ether); font-size:0.9rem; border-bottom:1px dashed #fff; margin-bottom:10px;">>> ADVANCED ARTIFACTS</h3>
+                <div id="advanced-list"></div>
+            </div>
+        </div>
+    </div>
+
+<script>
+/* =========================================
+    LANG DATA
+   ========================================= */
+const LANG_DATA = {
+    ja: {
+        graphicsTitle: "GRAPHICS SETTINGS",
+        labelParticles: "パーティクル量",
+        labelBloom: "Bloom効果",
+        labelBlur: "Blur効果",
+        labelBgColor: "背景カラー",
+        labelNumbers: "ダメージ数値",
+        labelConfirm: "リセット確認",
+        labelLang: "言語設定 / LANGUAGE",
+        dataTitle: "DATA MANAGEMENT",
+        systemTitle: "SYSTEM",
+        saveDesc: "ゲームの進行状況を保存します。",
+        resetDesc: "ゲームデータをリセットしますか？",
+        btnDelete: "⚠ DELETE SAVE DATA",
+        moduleHeader: ">> MODULES",
+        tabSystem: "SYSTEM",
+        tabChallenges: "CHALLENGES",
+        labelMult: "倍率",
+        labelBonus: "生産ボーナス",
+        labelRelic: "レリック",
+        labelEther: "エーテル",
+        labelClicks: "累計クリック",
+        labelPrestigeCount: "転生回数",
+        labelTranscendCount: "超越回数",
+        labelApotheosisCount: "真化回数",
+        labelOnline: "オンライン時間",
+        prestigeDesc: "進行リセット / レリック獲得",
+        transcendDesc: "全てをリセットし、上位次元へ到達する。<br>アーティファクト、モジュール、進行度は失われます。",
+        apotheosisDesc: "次元の枠組みを超越し、神性領域へ。<br>全てをリセットするが、強力な初期リソースボーナスを得る。",
+        uniqueHeader: ">> SYSTEM UPGRADES (Unique)",
+        standardHeader: ">> STANDARD ARTIFACTS",
+        advancedHeader: ">> ADVANCED ARTIFACTS",
+        labelGlobalBonus: "グローバル生産ボーナス",
+        chalNote: "(※モジュール個別強化は含まれません)",
+        catStat: "統計 (Statistics)",
+        catModule: "モジュール (Modules)",
+        catUnique: "システム拡張 (Unique)",
+        catArtifact: "アーティファクト (Artifacts)",
+        catAdvanced: "超越 (Transcendence)",
+        passiveProduce: "[PASSIVE] 生産量UP",
+        passiveModule: "[PASSIVE] 生産 x2",
+        passiveGlobal: "[PASSIVE] 全生産",
+        btnClaim: "CLAIM REWARD",
+        skinMenuTitle: "SKIN MENU",
+        labelSkinColor: "カラー",
+        labelSkinShape: "形状",
+        labelSkinAuto: "デフォルト"
+    },
+    en: {
+        graphicsTitle: "GRAPHICS SETTINGS",
+        labelParticles: "Particle Amount",
+        labelBloom: "Bloom Effect",
+        labelBlur: "Blur Effect",
+        labelBgColor: "Background Color",
+        labelNumbers: "Damage Numbers",
+        labelConfirm: "Confirm Reset",
+        labelLang: "言語設定 / LANGUAGE",
+        dataTitle: "DATA MANAGEMENT",
+        systemTitle: "SYSTEM",
+        saveDesc: "Saves the game progress.",
+        resetDesc: "Reset game data?",
+        btnDelete: "⚠ DELETE SAVE DATA",
+        moduleHeader: ">> MODULES",
+        tabSystem: "SYSTEM",
+        tabChallenges: "CHALLENGES",
+        labelMult: "Multiplier",
+        labelBonus: "Production Bonus",
+        labelRelic: "Relics",
+        labelEther: "Ether",
+        labelClicks: "Total Clicks",
+        labelPrestigeCount: "Total Prestige",
+        labelTranscendCount: "Total Transcend",
+        labelApotheosisCount: "Apotheosis",
+        labelOnline: "Online Time",
+        prestigeDesc: "Reset progress / Gain Relics",
+        transcendDesc: "Reset everything to reach a higher dimension.<br>Artifacts, modules, and progress will be lost.",
+        apotheosisDesc: "[Apotheosis] Transcend dimension.<br>Resets everything, but grants permanent starting resource bonus.",
+        uniqueHeader: ">> SYSTEM UPGRADES (Unique)",
+        standardHeader: ">> STANDARD ARTIFACTS",
+        advancedHeader: ">> ADVANCED ARTIFACTS",
+        labelGlobalBonus: "Global Production Bonus",
+        chalNote: "(*Individual module boosts not included)",
+        catStat: "Statistics",
+        catModule: "Modules",
+        catUnique: "Unique Systems",
+        catArtifact: "Artifacts",
+        catAdvanced: "Transcendence",
+        passiveProduce: "[PASSIVE] Production UP",
+        passiveModule: "[PASSIVE] Production x2",
+        passiveGlobal: "[PASSIVE] Global Prod.",
+        btnClaim: "CLAIM REWARD",
+        skinMenuTitle: "SKIN MENU",
+        labelSkinColor: "COLOR",
+        labelSkinShape: "SHAPE",
+        labelSkinAuto: "Default"
+    }
+};
+
+/* =========================================
+    GAME DATA & CONFIG
+   ========================================= */
+const PRESTIGE_THRESHOLD = 1000000;
+
+const STAGE_DEFS = [
+    { name: "Cyan",         name_ja: "水色",         color: "#00f7ff", dim: "#005f6b" },
+    { name: "Spring Green", name_ja: "黄緑色",       color: "#00ff88", dim: "#006b38" },
+    { name: "Purple",       name_ja: "紫色",         color: "#aa00ff", dim: "#4b006b" },
+    { name: "Red",          name_ja: "赤色",         color: "#ff3333", dim: "#6b0000" }, 
+    { name: "Gold",         name_ja: "金色",         color: "#ffd700", dim: "#6b5a00" },
+    { name: "Magenta",      name_ja: "桃色",         color: "#ff00ff", dim: "#6b006b" },
+    { name: "Orange",       name_ja: "橙色",         color: "#ff8800", dim: "#6b3b00" },
+    { name: "White",        name_ja: "白色",         color: "#ffffff", dim: "#444444" },
+    { name: "Sky Blue",     name_ja: "空色",         color: "#00ffff", dim: "#006b6b" },
+    { name: "Crimson",      name_ja: "紅赤色",       color: "#ff0055", dim: "#6b0024" },
+    { name: "Deep Purple",  name_ja: "深紫色",       color: "#9900ff", dim: "#3a006b" }
+];
+
+const CYCLE_SHAPE_CLASSES = [
+    "shape-c0", "shape-c1", "shape-c2", "shape-c3", "shape-c4",
+    "shape-c5", "shape-c6", "shape-c7", "shape-c8", "shape-c9","shape-c10"
+];
+
+const MODULE_DATA = {
+    cursor:   { baseCost: 15,     power: 1,       name_ja: "クォンタム・カーソル", name_en: "Quantum Cursor", type: "click" },
+    drone:    { baseCost: 120,    power: 10,      name_ja: "自律型採掘ドローン", name_en: "Auto-Mining Drone", type: "auto" },
+    network:  { baseCost: 650,    power: 45,      name_ja: "ニューラル・リンク", name_en: "Neural Link", type: "auto" },
+    plant:    { baseCost: 1800,   power: 120,     name_ja: "ダークマター発電所", name_en: "Dark Matter Plant", type: "auto" },
+    server:   { baseCost: 8500,   power: 400,     name_ja: "量子サーバー・クラスタ", name_en: "Quantum Server Cluster", type: "auto" },
+    reactor:  { baseCost: 25000,  power: 1200,    name_ja: "核融合リアクター", name_en: "Fusion Reactor", type: "auto" },
+    collider: { baseCost: 150000, power: 6000,    name_ja: "ハドロン粒子加速器", name_en: "Hadron Collider", type: "auto" },
+    matrix:   { baseCost: 1e6,    power: 35000,   name_ja: "マトリックス接続装置", name_en: "Matrix Interface", type: "auto" },
+    star:     { baseCost: 50e6,   power: 150000,  name_ja: "ダイソン・スフィア", name_en: "Dyson Sphere", type: "auto" },
+    galaxy:   { baseCost: 5e9,    power: 2e6,     name_ja: "銀河ハーベスター", name_en: "Galaxy Harvester", type: "auto" },
+    dimension:{ baseCost: 2e11,   power: 1.5e7,   name_ja: "次元穿孔ドリル", name_en: "Dimension Drill", type: "auto" },
+    timeline: { baseCost: 5e13,   power: 8e7,     name_ja: "時間軸安定化装置", name_en: "Timeline Stabilizer", type: "auto" },
+    reality:  { baseCost: 2e16,   power: 5e8,     name_ja: "現実改変エンジン", name_en: "Reality Engine", type: "auto" },
+    entropy:  { baseCost: 1e19,   power: 3e9,     name_ja: "エントロピー炉心", name_en: "Entropy Core", type: "auto" },
+    omega:    { baseCost: 2e22,   power: 2e10,    name_ja: "オメガ・ポイント", name_en: "Omega Point", type: "auto" },
+    akashic:  { baseCost: 3e33,   power: 1e14,    name_ja: "アカシック・レコード", name_en: "Akashic Record", type: "auto" },
+    causality:{ baseCost: 4e44,   power: 8e18,    name_ja: "因果律紡績機", name_en: "Causality Weaver", type: "auto" },
+    multiverse:{ baseCost: 5e55,  power: 5e22,    name_ja: "多元宇宙膜", name_en: "Multiverse Membrane", type: "auto" },
+    genesis:  { baseCost: 6e66,   power: 4e26,    name_ja: "創世の火花", name_en: "Genesis Spark", type: "auto" },
+    throne:   { baseCost: 7e77,   power: 5e30,    name_ja: "虚無の玉座", name_en: "Void Throne", type: "auto" }
+};
+
+const ARTIFACT_DATA = {
+    'art_power':    { name_ja: "量子増幅器", name_en: "Quantum Amplifier", desc_ja: "生産量UP", desc_en: "Prod. Multiplier", baseCost: 1, type: "mult", icon: "⚡" },
+    'art_cost':     { name_ja: "ナノ格子構造", name_en: "Nano-Lattice", desc_ja: "コスト割引", desc_en: "Cost Discount", baseCost: 3, type: "discount", icon: "📉" },
+    'art_crit':     { name_ja: "カオス回路", name_en: "Chaos Circuit", desc_ja: "クリティカル率", desc_en: "Crit Chance", baseCost: 5, type: "crit", icon: "💥", max: 50 },
+    'art_crit_dmg': { name_ja: "収束レンズ", name_en: "Focusing Lens", desc_ja: "クリティカル倍率", desc_en: "Crit Multiplier", baseCost: 8, type: "crit_dmg", icon: "🔍" },
+    'art_relic':    { name_ja: "古代のコンパス", name_en: "Ancient Compass", desc_ja: "レリック獲得UP", desc_en: "Relic Gain UP", baseCost: 15, type: "relic_boost", icon: "🧭" },
+    'art_auto_click': { name_ja: "オートクリッカー", name_en: "Auto-Clicker", desc_ja: "自動クリック", desc_en: "Auto Click", baseCost: 100, type: "auto_click", icon: "🖱️" },
+    'art_force_link': { name_ja: "フォース・リンク", name_en: "Force Link", desc_ja: "秒間収入をクリック力に加算", desc_en: "Link Income to Click Power", baseCost: 500, type: "force_link", icon: "🔗" }
+};
+
+const UNIQUE_DATA = {
+    'u_batch':      { name_ja: "一括制御システム", name_en: "Batch System", max: 4, baseCost: 10, desc_ja: "購入量変更を解放", desc_en: "Unlock Purchase Multipliers", icon: "📦" },
+    'u_claim_all':  { name_ja: "自動管理AI", name_en: "Admin AI", max: 1, baseCost: 100, desc_ja: "チャレンジ報酬一括受け取りを解放", desc_en: "Unlock Claim All Rewards", icon: "🤖" },
+    'u_auto_buy':   { name_ja: "自動構築アーム", name_en: "Auto-Build Arm", max: Object.keys(MODULE_DATA).length, baseCost: 50, desc_ja: "モジュール自動購入を上から順に解放", desc_en: "Unlock Auto-Buyer Modules", icon: "⚙️" }
+};
+
+const ADVANCED_DATA = {
+    'adv_time':     { name_ja: "時間加速装置", name_en: "Time Accelerator", baseCost: 1, desc_ja: "ゲームスピード x1.5 (乗算)", desc_en: "Game Speed x1.5 (Mult)", icon: "⏩" },
+    'adv_relic':    { name_ja: "レリック増幅器", name_en: "Relic Expander", baseCost: 1, desc_ja: "レリック獲得量 x2.0 (乗算)", desc_en: "Relic Gain x2.0 (Mult)", icon: "💎" },
+    'adv_core':     { name_ja: "アルファ・コア", name_en: "Alpha Core", baseCost: 1, desc_ja: "最終生産倍率 x2.0 (乗算)", desc_en: "Final Prod. x2.0 (Mult)", icon: "⚛️" },
+    'adv_perm_batch': { name_ja: "一括制御の永続化", name_en: "Perm. Batch", baseCost: 1, max: 1, desc_ja: "転生時に「一括制御システム」を最大Lvで維持", desc_en: "Keep Max Batch after Reset", icon: "💾" },
+    'adv_perm_admin': { name_ja: "管理AIの永続化", name_en: "Perm. Admin", baseCost: 1, max: 1, desc_ja: "転生時に「自動管理AI」を最大Lvで維持", desc_en: "Keep Max Admin AI after Reset", icon: "💾" },
+    'adv_perm_auto':  { name_ja: "自動構築の永続化", name_en: "Perm. Auto", baseCost: 1, max: 1, desc_ja: "転生時に「自動構築アーム」を最大Lvで維持", desc_en: "Keep Max Auto-Build after Reset", icon: "💾" }
+};
+
+const CHALLENGE_DEFS = {
+    click: { category:'stat', desc_ja: "累計クリック数", desc_en: "Total Clicks", key: 'totalClicks', baseTarget: 1000, scale: 2.5, rewardBase: 0.02, order: 1 }, 
+    stage: { category:'stat', desc_ja: "到達フェーズ", desc_en: "Max Phase", key: 'currentStage', baseTarget: 2, scale: 1.2, rewardBase: 0.10, isPhase: true, order: 2 },
+    prestige: { category:'stat', desc_ja: "累計転生回数", desc_en: "Total Prestige", key: 'prestigeCount', baseTarget: 1, scale: 2, rewardBase: 0.05, order: 3 },
+    relics: { category:'stat', desc_ja: "所持レリック数", desc_en: "Relics Owned", key: 'relics', baseTarget: 10, scale: 3, rewardBase: 0.02, order: 4 }, 
+    transcend: { category:'stat', desc_ja: "累計超越回数", desc_en: "Total Transcend", key: 'transcendCount', baseTarget: 1, scale: 2, rewardBase: 0.20, order: 5 },
+    apotheosis: { category:'stat', desc_ja: "真化回数", desc_en: "Total Apotheosis", key: 'apotheosisCount', baseTarget: 1, mode: 'linear', rewardBase: 0.50, order: 6 }
+};
+
+let mOrder = 10;
+for(let k in MODULE_DATA) {
+    CHALLENGE_DEFS[`mod_${k}`] = {
+        category: 'module', desc_ja: `${MODULE_DATA[k].name_ja} Lv`, desc_en: `${MODULE_DATA[k].name_en} Lv`, key: k, isModule: true, baseTarget: 50, mode: 'step', rewardBase: 2, order: mOrder++
+    };
+}
+let uOrder = 200;
+for(let k in UNIQUE_DATA) {
+    CHALLENGE_DEFS[`unique_${k}`] = {
+        category: 'unique', desc_ja: `${UNIQUE_DATA[k].name_ja} Lv`, desc_en: `${UNIQUE_DATA[k].name_en} Lv`, key: k, isUnique: true, baseTarget: 1, scale: 1, rewardBase: 0.15, mode: 'linear', order: uOrder++
+    };
+}
+let aOrder = 100;
+for(let k in ARTIFACT_DATA) {
+    CHALLENGE_DEFS[`art_${k}`] = {
+        category: 'artifact', desc_ja: `${ARTIFACT_DATA[k].name_ja} Lv`, desc_en: `${ARTIFACT_DATA[k].name_en} Lv`, key: k, isArtifact: true, baseTarget: 5, scale: 1.5, rewardBase: 0.03, order: aOrder++
+    };
+}
+let advOrder = 300;
+for(let k in ADVANCED_DATA) {
+    CHALLENGE_DEFS[`adv_${k}`] = {
+        category: 'advanced', desc_ja: `${ADVANCED_DATA[k].name_ja} Lv`, desc_en: `${ADVANCED_DATA[k].name_en} Lv`, key: k, isAdvanced: true, baseTarget: 1, scale: 1, rewardBase: 0.25, mode: 'linear', order: advOrder++
+    };
+}
+
+let game = {
+    score: 0, totalScore: 0, relics: 0, ether: 0,
+    prestigeCount: 0, transcendCount: 0, apotheosisCount: 0,
+    skinSettings: {
+        mode: 'auto',
+        manualColor: 'auto', // ★ 10 から 'auto' に変更
+        manualShape: 'auto'   // ★ 10 から 'auto' に変更
+    },
+    startTime: Date.now(), currentStage: 0,
+    upgrades: {}, artifacts: {}, uniqueArtifacts: {}, advancedArtifacts: {},
+    stats: { 
+        totalClicks: 0,
+        maxStage: 0,
+        maxRelics: 0,
+        totalPrestige: 0,
+        maxModules: {},
+        maxArtifacts: {},
+        maxUnique: {},
+        maxAdvanced: {}
+    }, 
+    challengeTiers: {}, seenModules: {}, autoBuyToggles: {},
+    settings: {
+        particles: 'high',
+        bloom: true,
+        blur: true,
+        numbers: true,
+        bgColor: true,
+        lang: 'ja'
+    }
+};
+let tabScrollStates = {};
+let buyMode = 1;
+for(let k in MODULE_DATA) { game.upgrades[k] = { count: 0 }; game.autoBuyToggles[k] = false; game.stats.maxModules[k] = 0; }
+for(let k in ARTIFACT_DATA) { game.artifacts[k] = 0; game.stats.maxArtifacts[k] = 0; }
+for(let k in UNIQUE_DATA) { game.uniqueArtifacts[k] = 0; game.stats.maxUnique[k] = 0; }
+for(let k in ADVANCED_DATA) { game.advancedArtifacts[k] = 0; game.stats.maxAdvanced[k] = 0; }
+for(let k in CHALLENGE_DEFS) game.challengeTiers[k] = 1;
+
+let particles = [];
+const canvas = document.getElementById('particleCanvas');
+const ctx = canvas.getContext('2d');
+let lastTime = Date.now();
+let autoClickAccumulator = 0;
+
+function init() {
+    loadGame();
+    initUI();
+    applyGraphicsSettings(); 
+    resizeCanvas();
+    updateStageConfig(true);
+    setBuyMode(game.settings.buyMode || 1);
+    
+    window.addEventListener('resize', resizeCanvas);
+    document.getElementById('reactor-wrapper').addEventListener('mousedown', handleClick);
+    
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Enter') {
+            e.preventDefault(); // ★重要：ボタンへのフォーカスによる誤作動（標準動作）をキャンセルする
+            
+            if (!e.repeat) { // 長押しによる連打（リピート）を防止
+                const rect = document.getElementById('reactor-wrapper').getBoundingClientRect();
+                handleClick({ clientX: rect.left+rect.width/2, clientY: rect.top+rect.height/2 });
+                const wrap = document.getElementById('reactor-wrapper');
+                wrap.style.transform = "scale(0.95)";
+                setTimeout(() => wrap.style.transform = "scale(1)", 50);
+            }
+        }
+    });
+
+    updateUI();
+    restoreScrollPositions();
+    requestAnimationFrame(gameLoop);
+    setInterval(saveGame, 5000);
+    setInterval(updateUI, 100); 
+}
+
+function updateGraphics(key, value) {
+    game.settings[key] = value;
+    applyGraphicsSettings();
+    if(key === 'bgColor') updateStageConfig();
+    if(key === 'lang') {
+        initUI(); // 言語変更時はUIを再構築
+        updateUI();
+    }
+}
+function toggleModal(show) {
+    const modal = document.getElementById('modal-overlay');
+    if (show) {
+        modal.style.display = 'flex';
+        // 設定値の表示を最新状態に更新
+        applyGraphicsSettings();
+    } else {
+        modal.style.display = 'none';
+    }
+}
+
+function applyGraphicsSettings() {
+    if (!game.settings.bloom) {
+        document.body.classList.add('low-perf');
+    } else {
+        document.body.classList.remove('low-perf');
+    }
+
+    if (!game.settings.blur) {
+        document.body.classList.add('no-blur');
+    } else {
+        document.body.classList.remove('no-blur');
+    }
+
+    document.getElementById('set-particles').value = game.settings.particles;
+    document.getElementById('set-bloom').checked = game.settings.bloom;
+    document.getElementById('set-blur').checked = game.settings.blur;
+    document.getElementById('set-numbers').checked = game.settings.numbers;
+    const confirmCheck = document.getElementById('set-confirm');
+    if(confirmCheck) confirmCheck.checked = game.settings.confirmations;
+    document.getElementById('set-lang').value = game.settings.lang || 'ja';
+    
+    const bgCheck = document.getElementById('set-bg-color');
+    if(bgCheck) bgCheck.checked = game.settings.bgColor;
+
+    // UIテキスト翻訳の更新
+    const L = LANG_DATA[game.settings.lang] || LANG_DATA.ja;
+    document.getElementById('ui-graphics-title').innerText = L.graphicsTitle;
+    document.getElementById('ui-label-particles').innerText = L.labelParticles;
+    document.getElementById('ui-label-bloom').innerText = L.labelBloom;
+    document.getElementById('ui-label-blur').innerText = L.labelBlur;
+    document.getElementById('ui-label-bgcolor').innerText = L.labelBgColor;
+    document.getElementById('ui-label-numbers').innerText = L.labelNumbers;
+    const labelConfirm = document.getElementById('ui-label-confirm');
+    if(labelConfirm) labelConfirm.innerText = L.labelConfirm;
+    document.getElementById('ui-label-lang').innerText = L.labelLang;
+    document.getElementById('ui-data-title').innerText = L.dataTitle;
+    document.getElementById('ui-system-title').innerText = L.systemTitle;
+    document.getElementById('ui-save-desc').innerText = L.saveDesc;
+    document.getElementById('ui-reset-desc').innerText = L.resetDesc;
+    document.getElementById('ui-btn-delete').innerText = L.btnDelete;
+    document.getElementById('ui-module-header').innerText = L.moduleHeader;
+    document.getElementById('ui-tab-system').innerText = L.tabSystem;
+    document.getElementById('ui-tab-challenges').innerText = L.tabChallenges;
+    document.getElementById('ui-label-mult').innerText = L.labelMult;
+    document.getElementById('ui-label-bonus').innerText = L.labelBonus;
+    document.getElementById('ui-label-relic').innerText = L.labelRelic;
+    document.getElementById('ui-label-ether').innerText = L.labelEther;
+    document.getElementById('ui-label-clicks').innerText = L.labelClicks;
+    document.getElementById('ui-label-prestige-count').innerText = L.labelPrestigeCount;
+    document.getElementById('ui-label-transcend-count').innerText = L.labelTranscendCount;
+    document.getElementById('ui-label-apotheosis-count').innerText = L.labelApotheosisCount;
+    document.getElementById('ui-label-online').innerText = L.labelOnline;
+    document.getElementById('ui-prestige-desc').innerText = L.prestigeDesc;
+    document.getElementById('ui-transcend-desc').innerHTML = L.transcendDesc;
+    document.getElementById('ui-apotheosis-desc').innerHTML = L.apotheosisDesc;
+    document.getElementById('ui-unique-header').innerText = L.uniqueHeader;
+    document.getElementById('ui-standard-header').innerText = L.standardHeader;
+    document.getElementById('ui-advanced-header').innerText = L.advancedHeader;
+    document.getElementById('ui-label-global-bonus').innerText = L.labelGlobalBonus;
+    document.getElementById('ui-chal-note').innerText = L.chalNote;
+
+    const skinTitle = document.getElementById('skin-menu-title');
+    if(skinTitle) skinTitle.innerText = L.skinMenuTitle;
+    const skinColorLabel = document.getElementById('skin-label-color');
+    if(skinColorLabel) skinColorLabel.innerText = L.labelSkinColor;
+    const skinShapeLabel = document.getElementById('skin-label-shape');
+    if(skinShapeLabel) skinShapeLabel.innerText = L.labelSkinShape;
+}
+
+function exportSave() {
+    saveGame();
+    const json = JSON.stringify(game);
+    const base64 = btoa(unescape(encodeURIComponent(json)));
+    navigator.clipboard.writeText(base64).then(() => {
+        spawnFloater(window.innerWidth / 2, window.innerHeight / 2, "COPIED TO CLIPBOARD!", true);
+    }).catch(err => {
+        prompt("COPY THIS CODE:", base64);
+    });
+}
+
+function importSave() {
+    const data = prompt("PASTE SAVE CODE:");
+    if (!data) return;
+    try {
+        const json = decodeURIComponent(escape(atob(data)));
+        const parsed = JSON.parse(json);
+        if (parsed.score !== undefined) {
+            fixGameData(parsed); 
+            saveGame();
+            location.reload();
+        } else {
+            alert("INVALID SAVE DATA");
+        }
+    } catch (e) {
+        alert("IMPORT FAILED");
+    }
+}
+
+function checkMaxStats() {
+    const currentMaxStage = game.stats.maxStage || 0;
+    if (game.currentStage > currentMaxStage) game.stats.maxStage = game.currentStage;
+
+    const currentMaxRelics = game.stats.maxRelics || 0;
+    if (game.relics > currentMaxRelics) game.stats.maxRelics = game.relics;
+    
+    if(!game.stats.maxModules) game.stats.maxModules = {};
+    for(let k in game.upgrades) {
+        const currentMax = game.stats.maxModules[k] || 0;
+        if (game.upgrades[k].count > currentMax) {
+            game.stats.maxModules[k] = game.upgrades[k].count;
+        }
+    }
+
+    if(!game.stats.maxArtifacts) game.stats.maxArtifacts = {};
+    for(let k in game.artifacts) {
+        const currentMax = game.stats.maxArtifacts[k] || 0;
+        if (game.artifacts[k] > currentMax) {
+            game.stats.maxArtifacts[k] = game.artifacts[k];
+        }
+    }
+
+    if(!game.stats.maxUnique) game.stats.maxUnique = {};
+    for(let k in game.uniqueArtifacts) {
+        const currentMax = game.stats.maxUnique[k] || 0;
+        if (game.uniqueArtifacts[k] > currentMax) {
+            game.stats.maxUnique[k] = game.uniqueArtifacts[k];
+        }
+    }
+
+    if(!game.stats.maxAdvanced) game.stats.maxAdvanced = {};
+    for(let k in game.advancedArtifacts) {
+        const currentMax = game.stats.maxAdvanced[k] || 0;
+        if (game.advancedArtifacts[k] > currentMax) {
+            game.stats.maxAdvanced[k] = game.advancedArtifacts[k];
+        }
+    }
+}
+
+function handleClick(e) {
+    game.stats.totalClicks++;
+    const wrap = document.getElementById('reactor-wrapper');
+    wrap.style.transform = "scale(0.95)";
+    setTimeout(() => wrap.style.transform = "scale(1)", 50);
+
+    let val = getClickPower();
+    if (isNaN(val) || val <= 0) val = 1; 
+
+    const critChance = getArtifactEffectValue('art_crit', game.artifacts.art_crit);
+    const critMult = getArtifactEffectValue('art_crit_dmg', game.artifacts.art_crit_dmg);
+    let isCrit = false;
+    
+    if (Math.random() < critChance) {
+        val *= critMult;
+        isCrit = true;
+    }
+
+    addScore(val);
+    if(game.settings.numbers) {
+        spawnFloater(e.clientX, e.clientY, `+${formatNumber(val)}`, isCrit);
+    }
+}
+
+function getStageConfig(stageIndex) {
+    const phase = stageIndex + 1;
+    let defIndex;
+    let shapeIndex;
+
+    // 進行度に基づいた本来の数値（Auto用）
+    const autoDefIndex = (phase >= 101) ? 10 : (phase - 1) % 10;
+    const autoShapeIndex = (phase >= 101) ? 10 : Math.floor((phase - 1) / 10);
+
+    // Colorの決定：'auto'という文字列を厳密にチェック
+    if (!game.skinSettings || game.skinSettings.manualColor === 'auto' || game.skinSettings.manualColor === undefined) {
+        defIndex = autoDefIndex;
+    } else {
+        defIndex = parseInt(game.skinSettings.manualColor);
+    }
+
+    // Shapeの決定：'auto'という文字列を厳密にチェック
+    if (!game.skinSettings || game.skinSettings.manualShape === 'auto' || game.skinSettings.manualShape === undefined) {
+        shapeIndex = autoShapeIndex;
+    } else {
+        shapeIndex = parseInt(game.skinSettings.manualShape);
+    }
+
+    // 数値変換に失敗した場合の保険
+    if (isNaN(defIndex)) defIndex = autoDefIndex;
+    if (isNaN(shapeIndex)) shapeIndex = autoShapeIndex;
+
+    // 範囲外エラー防止
+    if (defIndex >= STAGE_DEFS.length) defIndex = STAGE_DEFS.length - 1;
+    if (shapeIndex >= CYCLE_SHAPE_CLASSES.length) shapeIndex = CYCLE_SHAPE_CLASSES.length - 1;
+
+    const def = STAGE_DEFS[defIndex];
+    const shapeClass = CYCLE_SHAPE_CLASSES[shapeIndex];
+
+    return { 
+        ...def, 
+        cycle: shapeIndex,
+        displayName: `Phase ${phase}`, 
+        shapeClass: shapeClass
+    };
+}
+
+function getStageThreshold(stageIndex) {
+    if (stageIndex === 0) return 0;
+    if (stageIndex === 1) return 3000000;
+    return 3000000 * Math.pow(13, stageIndex - 1);
+}
+
+function getArtifactEffectValue(key, level) {
+    level = level || 0;
+    if(key === 'art_power') return 1 + (level * 0.5);
+    if(key === 'art_cost') return Math.pow(0.92, level);
+    if(key === 'art_crit') return level * 0.02;
+    if(key === 'art_crit_dmg') return 5 + (level * 1.0);
+    if(key === 'art_relic') return 1 + (level * 0.25);
+    if(key === 'art_auto_click') return level * 1;
+    if(key === 'art_force_link') return level * 0.005;
+    return 0;
+}
+
+function getArtifactEffectString(key, level) {
+    if(key === 'art_power') return `x${getArtifactEffectValue(key, level).toFixed(2)}`;
+    if(key === 'art_cost') return `x${getArtifactEffectValue(key, level).toFixed(2)} Cost`;
+    if(key === 'art_crit') return `${(getArtifactEffectValue(key, level)*100).toFixed(0)}%`;
+    if(key === 'art_crit_dmg') return `x${getArtifactEffectValue(key, level).toFixed(1)}`;
+    if(key === 'art_relic') return `x${getArtifactEffectValue(key, level).toFixed(2)}`;
+    if(key === 'art_auto_click') return `+${level}/sec`;
+    if(key === 'art_force_link') return `+${(level*0.5).toFixed(1)}% Income`;
+    return "";
+}
+
+function getGlobalChallengeMultiplier() {
+    let mult = 1.0;
+    for (let k in CHALLENGE_DEFS) {
+        const def = CHALLENGE_DEFS[k];
+        if (def.category !== 'module') {
+            const tier = game.challengeTiers[k] || 1;
+            mult += (tier - 1) * def.rewardBase;
+        }
+    }
+    return mult;
+}
+
+function getModuleChallengeMultiplier(moduleKey) {
+    const chalKey = `mod_${moduleKey}`;
+    const def = CHALLENGE_DEFS[chalKey];
+    if (!def) return 1.0;
+    const tier = game.challengeTiers[chalKey] || 1;
+    return Math.pow(2, tier - 1);
+}
+
+function getAdvancedMultiplier() { return Math.pow(2.0, game.advancedArtifacts.adv_core); }
+function getTimeSpeed() { return Math.pow(1.5, game.advancedArtifacts.adv_time); }
+
+function getApotheosisMult() {
+    return 1;
+}
+function getTranscendReq() {
+    // 初回は50,000。以降、回数に応じて5倍ずつ増える
+    return 50000 * Math.pow(5, game.transcendCount);
+}
+function getApotheosisReq() {
+    return 20 + (game.apotheosisCount * 10);
+}
+function getApotheosisStartBonus() {
+    // 真化回数 1回につき +10 の初期リソースを与える
+    // (例: 1回目=10, 2回目=20...)
+    if (game.apotheosisCount === 0) return 0;
+    return game.apotheosisCount * 10;
+}
+function getApotheosisScoreBonus() {
+    return 0;
+}
+
+function getGlobalMultipliers() {
+    let art = getArtifactEffectValue('art_power', game.artifacts.art_power);
+    let stage = Math.pow(1.5, game.currentStage);
+    let globalChal = getGlobalChallengeMultiplier();
+    let adv = getAdvancedMultiplier();
+    return art * stage * globalChal * adv;
+}
+
+function getClickPower() {
+    let base = 1 + (game.upgrades.cursor.count * MODULE_DATA.cursor.power);
+    base *= getModuleChallengeMultiplier('cursor');
+    base *= getGlobalMultipliers();
+    const linkBoost = getArtifactEffectValue('art_force_link', game.artifacts.art_force_link);
+    if (linkBoost > 0) base += getAutoIncome() * linkBoost;
+    return base;
+}
+
+function getAutoIncome() {
+    let income = 0;
+    for(let k in game.upgrades) {
+        if(k !== 'cursor') {
+            let modPower = game.upgrades[k].count * MODULE_DATA[k].power;
+            modPower *= getModuleChallengeMultiplier(k);
+            income += modPower;
+        }
+    }
+    return income * getGlobalMultipliers();
+}
+
+function getBulkModuleCost(key, amountToBuy) {
+    const currentCount = game.upgrades[key].count;
+    const base = MODULE_DATA[key].baseCost;
+    const r = 1.15;
+    const discount = getArtifactEffectValue('art_cost', game.artifacts.art_cost);
+    let n = amountToBuy;
+    let cost = 0;
+    if (amountToBuy === -1) {
+        const priceStart = base * Math.pow(r, currentCount) * discount;
+        if (priceStart > game.score) return { cost: priceStart, count: 0 };
+        const maxAffordable = Math.floor( Math.log(1 + (game.score * (r - 1) / priceStart)) / Math.log(r) );
+        n = Math.max(1, maxAffordable);
+    }
+    const startCost = base * Math.pow(r, currentCount);
+    cost = Math.floor( startCost * (Math.pow(r, n) - 1) / (r - 1) * discount );
+    if (amountToBuy === -1 && cost > game.score) {
+        while(cost > game.score && n > 0) { n--; cost = Math.floor(startCost * (Math.pow(r, n) - 1) / (r - 1) * discount); }
+    }
+    if (isNaN(cost) || cost < 0) cost = Infinity; // エラー時は購入不可にする
+    if (isNaN(n) || n < 0) n = 0;
+    
+    return { cost: cost, count: n };
+}
+
+function getBulkArtifactCost(key, amountToBuy) {
+    const level = game.artifacts[key];
+    const def = ARTIFACT_DATA[key];
+    const base = def.baseCost;
+    const r = 1.6;
+    let maxLevel = def.max || Infinity;
+
+    if (level >= maxLevel) return { cost: 0, count: 0 };
+
+    let n = amountToBuy;
+    let cost = 0;
+    
+    if (amountToBuy === -1) {
+        const priceStart = base * Math.pow(r, level);
+        if (priceStart > game.relics) return { cost: priceStart, count: 0 };
+        const maxAffordable = Math.floor( Math.log(1 + (game.relics * (r - 1) / priceStart)) / Math.log(r) );
+        n = Math.max(1, maxAffordable);
+        if (level + n > maxLevel) n = maxLevel - level;
+    } else {
+        if (level + n > maxLevel) n = maxLevel - level;
+    }
+
+    if (n <= 0) return { cost: 0, count: 0 };
+
+    const startCost = base * Math.pow(r, level);
+    cost = Math.floor( startCost * (Math.pow(r, n) - 1) / (r - 1) );
+    return { cost: cost, count: n };
+}
+
+function getUniqueArtifactCost(key) {
+    const level = game.uniqueArtifacts[key];
+    if (level >= UNIQUE_DATA[key].max) return Infinity;
+    if (key === 'u_batch') { 
+        const costs = [10, 50, 200, 2000]; 
+        return costs[level]; 
+    }
+    return Math.floor(UNIQUE_DATA[key].baseCost * Math.pow(3, level));
+}
+
+function getBulkAdvancedArtifactCost(key, amountToBuy) {
+    const def = ADVANCED_DATA[key];
+    const currentLevel = game.advancedArtifacts[key] || 0;
+    const maxLevel = def.max || Infinity;
+    const baseCost = 1; // 現在、超越アーティファクトのコストは一律1エーテル
+
+    // 既に最大レベルなら購入不可
+    if (currentLevel >= maxLevel) return { cost: 0, count: 0 };
+
+    let n = amountToBuy;
+
+    // MAX購入モードの場合
+    if (amountToBuy === -1) {
+        // 所持エーテルで買えるだけ買う
+        let affordable = Math.floor(game.ether / baseCost);
+        n = affordable;
+        // 上限がある場合はキャップする
+        if (currentLevel + n > maxLevel) {
+            n = maxLevel - currentLevel;
+        }
+    } else {
+        // 指定数(x5, x10)購入の場合も上限を超えないようにする
+        if (currentLevel + n > maxLevel) {
+            n = maxLevel - currentLevel;
+        }
+    }
+
+    // 購入数が0以下（エーテル不足や最大レベル到達）
+    if (n <= 0) return { cost: 0, count: 0 };
+
+    // コスト計算
+    const totalCost = n * baseCost;
+
+    return { cost: totalCost, count: n };
+}
+
+function addScore(amt) {
+    if (isNaN(amt)) amt = 0;
+    game.score += amt; game.totalScore += amt;
+    checkStageProgress();
+    checkMaxStats();
+}
+
+function checkStageProgress() {
+    const nextThreshold = getStageThreshold(game.currentStage + 1);
+    if (game.totalScore >= nextThreshold) {
+        game.currentStage++; updateStageConfig();
+    }
+}
+
+function calculateRelicGain() {
+    if (game.totalScore < PRESTIGE_THRESHOLD) return 0;
+    let baseGain = Math.floor(Math.pow(5, game.currentStage));
+    let artBonus = getArtifactEffectValue('art_relic', game.artifacts.art_relic);
+    let advBonus = Math.pow(2.0, game.advancedArtifacts.adv_relic);
+
+    return Math.floor(baseGain * artBonus * advBonus);
+}
+
+function setBuyMode(mode) {
+    buyMode = mode;
+    if(game.settings) {
+        game.settings.buyMode = mode;
+    }
+    const btns = document.querySelectorAll('.buy-btn');
+    btns.forEach(b => {
+        b.classList.remove('active');
+        if(b.innerText === (mode === -1 ? 'MAX' : 'x'+mode)) b.classList.add('active');
+    });
+    updateUI();
+}
+
+function toggleAutoBuy(key) { game.autoBuyToggles[key] = !game.autoBuyToggles[key]; updateUI(); }
+
+function initUI() {
+    const lang = game.settings.lang || 'ja';
+    const uList = document.getElementById('upgrade-list');
+    uList.innerHTML = '';
+    for(let k in MODULE_DATA) {
+        const name = lang === 'ja' ? MODULE_DATA[k].name_ja : MODULE_DATA[k].name_en;
+        const btn = document.createElement('div');
+        btn.className = 'btn-upgrade clickable';
+        btn.id = `btn-${k}`;
+        btn.onclick = (e) => { if(!e.target.closest('.toggle-switch')) buyUpgrade(k); };
+        btn.innerHTML = `
+            <div class="auto-buy-wrapper" id="ab-wrap-${k}" style="display:none;">
+                <span class="toggle-label">AUTO</span>
+                <div class="toggle-switch" id="ab-toggle-${k}" onclick="toggleAutoBuy('${k}')"></div>
+            </div>
+            <div class="btn-row">
+                <span class="item-name">${name}</span>
+                <span class="cost-text" id="cost-${k}">0</span>
+            </div>
+            <div class="btn-row">
+                <span class="item-lvl" style="color:#aaa; font-size:0.8rem;">Lv.<span id="lv-${k}">0</span></span>
+            </div>
+            <div class="effect-row">
+                <span id="eff-curr-${k}" class="val-curr">0</span>
+                <span class="arrow">→</span>
+                <span id="eff-next-${k}" class="val-next">0</span>
+            </div>
+        `;
+        uList.appendChild(btn);
+    }
+
+    const aList = document.getElementById('artifact-list');
+    aList.innerHTML = '';
+    for(let k in ARTIFACT_DATA) {
+        const name = lang === 'ja' ? ARTIFACT_DATA[k].name_ja : ARTIFACT_DATA[k].name_en;
+        const desc = lang === 'ja' ? ARTIFACT_DATA[k].desc_ja : ARTIFACT_DATA[k].desc_en;
+        const div = document.createElement('div');
+        div.className = 'artifact-card normal clickable';
+        div.onclick = () => buyArtifact(k);
+        div.id = `art-btn-${k}`;
+        div.innerHTML = `
+            <div class="btn-row">
+                <span style="font-weight:bold; color:#fff;">${ARTIFACT_DATA[k].icon} ${name}</span>
+                <span style="font-size:0.8em; color:var(--theme-color);">Lv.<span id="art-lv-${k}">0</span></span>
+            </div>
+            <div style="font-size:0.75rem; color:#ccc; margin:4px 0;">${desc}</div>
+            <div class="effect-row">
+                <span id="art-eff-curr-${k}" class="val-curr"></span>
+                <span class="arrow">→</span>
+                <span id="art-eff-next-${k}" class="val-next"></span>
+            </div>
+            <div class="btn-row" style="margin-top:5px;">
+                <span></span>
+                <span style="font-size:0.8rem;">Cost: <span class="relic-text" id="art-cost-${k}">0</span></span>
+            </div>
+        `;
+        aList.appendChild(div);
+    }
+
+    const uArtList = document.getElementById('unique-list');
+    uArtList.innerHTML = '';
+    for(let k in UNIQUE_DATA) {
+        const name = lang === 'ja' ? UNIQUE_DATA[k].name_ja : UNIQUE_DATA[k].name_en;
+        const desc = lang === 'ja' ? UNIQUE_DATA[k].desc_ja : UNIQUE_DATA[k].desc_en;
+        const div = document.createElement('div');
+        div.className = 'unique-card clickable';
+        div.onclick = () => buyUniqueArtifact(k);
+        div.id = `unique-btn-${k}`;
+        div.innerHTML = `
+            <div class="btn-row">
+                <span style="font-weight:bold; color:#fff;">${UNIQUE_DATA[k].icon} ${name}</span>
+                <span style="font-size:0.8em; color:var(--unique);">Lv.<span id="u-lv-${k}">0</span> / ${UNIQUE_DATA[k].max}</span>
+            </div>
+            <div style="font-size:0.75rem; color:#ccc; margin:4px 0;">${desc}</div>
+            <div class="btn-row" style="margin-top:5px;">
+                <span></span>
+                <span style="font-size:0.8rem;">Cost: <span class="relic-text" id="u-cost-${k}">0</span></span>
+            </div>
+        `;
+        uArtList.appendChild(div);
+    }
+
+    const advList = document.getElementById('advanced-list');
+    advList.innerHTML = '';
+    for(let k in ADVANCED_DATA) {
+        const name = lang === 'ja' ? ADVANCED_DATA[k].name_ja : ADVANCED_DATA[k].name_en;
+        const desc = lang === 'ja' ? ADVANCED_DATA[k].desc_ja : ADVANCED_DATA[k].desc_en;
+        const div = document.createElement('div');
+        div.className = 'artifact-card ether clickable';
+        div.onclick = () => buyAdvancedArtifact(k);
+        div.id = `adv-btn-${k}`;
+        div.innerHTML = `
+            <div class="btn-row">
+                <span style="font-weight:bold; color:#fff;">${ADVANCED_DATA[k].icon} ${name}</span>
+                <span style="font-size:0.8em; color:var(--ether);">Lv.<span id="adv-lv-${k}">0</span></span>
+            </div>
+            <div style="font-size:0.75rem; color:#ccc; margin:4px 0;">${desc}</div>
+            <div class="btn-row" style="margin-top:5px;">
+                <span></span>
+                <span style="font-size:0.8rem;">Cost: <span class="ether-text" id="adv-cost-${k}">0</span></span>
+            </div>
+        `;
+        advList.appendChild(div);
+    }
+    updateChallengesUI();
+}
+
+function updateUI() {
+    checkMaxStats(); 
+    document.getElementById('score-display').innerText = formatNumber(Math.floor(game.score));
+    document.getElementById('mps-display').innerText = formatNumber(Math.floor(getAutoIncome())) + " / sec";
+    const globalMult = getGlobalMultipliers();
+
+    const showArtifacts = (game.prestigeCount > 0) || (game.stats.totalPrestige > 0) || (game.transcendCount > 0);
+    if(showArtifacts) document.getElementById('tab-btn-artifacts').style.display = 'block';
+
+    const tReq = getTranscendReq();
+    const hasTranscendHistory = game.transcendCount > 0 || game.stats.totalTranscend > 0 || game.apotheosisCount > 0;
+    if(game.relics >= 50000 || hasTranscendHistory) {
+        document.getElementById('btn-transcend').style.display = 'block';
+    } else {
+        document.getElementById('btn-transcend').style.display = 'none';
+    }
+    if(hasTranscendHistory) {
+        document.getElementById('tab-btn-transcend').style.display = 'block';
+    } else {
+        document.getElementById('tab-btn-transcend').style.display = 'none';
+    }
+
+    const apoReq = getApotheosisReq();
+    const nextCount = game.apotheosisCount + 1;
+    const nextOther = nextCount * 10;
+    if (game.currentStage + 1 >= 20 || game.apotheosisCount > 0) {
+        const btnApo = document.getElementById('btn-apotheosis');
+        btnApo.style.display = 'block';
+        document.getElementById('apotheosis-req').innerText = `REQ: Phase ${apoReq}`;
+        document.getElementById('apotheosis-gain').innerText = `NEXT: Start +${nextOther} Ether`;
+        
+        if (game.currentStage + 1 >= apoReq) {
+            btnApo.disabled = false;
+        } else {
+            btnApo.disabled = true;
+        }
+    }
+
+    const hasTranscend = (game.transcendCount > 0) || (game.stats.totalTranscend > 0) || (game.apotheosisCount > 0);
+    const skinBtn = document.getElementById('skin-btn');
+    if (skinBtn) {
+        skinBtn.style.display = (game.apotheosisCount >= 10) ? 'flex' : 'none';
+    }
+    const hasPrestige = (game.prestigeCount > 0) || (game.stats.totalPrestige > 0);
+    const hasApotheosis = (game.apotheosisCount > 0);
+
+    document.getElementById('stat-row-relic').style.display = hasPrestige ? 'block' : 'none';
+    document.getElementById('stat-row-prestige').style.display = hasPrestige ? 'block' : 'none';
+    document.getElementById('stat-row-ether').style.display = hasTranscend ? 'block' : 'none';
+    document.getElementById('stat-row-transcend').style.display = hasTranscend ? 'block' : 'none';
+    document.getElementById('stat-row-apotheosis').style.display = hasApotheosis ? 'block' : 'none'; 
+
+    const nextThreshold = getStageThreshold(game.currentStage + 1);
+    const prevThreshold = getStageThreshold(game.currentStage);
+    let progress = 0;
+    if (nextThreshold > 0) progress = Math.min(100, Math.max(0, (game.totalScore - prevThreshold) / (nextThreshold - prevThreshold) * 100));
+    else progress = 100;
+    document.getElementById('stage-progress-fill').style.width = progress + "%";
+    document.getElementById('stage-req-text').innerText = `Next Phase: ${formatNumber(nextThreshold)}`;
+    document.getElementById('chal-total-bonus').innerText = `+${formatNumber((getGlobalChallengeMultiplier() - 1) * 100)}%`;
+
+    const batchLvl = game.uniqueArtifacts.u_batch;
+    document.getElementById('btn-buy-5').className = `buy-btn ${batchLvl >= 1 ? 'unlocked' : ''} ${buyMode===5?'active':''}`;
+    document.getElementById('btn-buy-10').className = `buy-btn ${batchLvl >= 2 ? 'unlocked' : ''} ${buyMode===10?'active':''}`;
+    document.getElementById('btn-buy-max').className = `buy-btn ${batchLvl >= 3 ? 'unlocked' : ''} ${buyMode===-1?'active':''}`;
+    
+    document.getElementById('btn-claim-all').style.display = game.uniqueArtifacts.u_claim_all > 0 ? 'block' : 'none';
+    document.getElementById('btn-buy-all-max').style.display = batchLvl >= 4 ? 'block' : 'none';
+
+    const headRelic = document.getElementById('header-relic-display');
+    if (showArtifacts) {
+        headRelic.style.display = 'block'; headRelic.innerText = "Relics : " + formatNumber(Math.floor(game.relics));
+    } else {
+        headRelic.style.display = 'none';
+    }
+
+    let previousUnlocked = true;
+    const autoBuyLvl = game.uniqueArtifacts.u_auto_buy;
+    const keys = Object.keys(MODULE_DATA);
+    for(let i=0; i<keys.length; i++) {
+        const k = keys[i];
+        const bulk = getBulkModuleCost(k, buyMode);
+        const modSpec = getModuleChallengeMultiplier(k);
+        const basePwr = MODULE_DATA[k].power * globalMult * modSpec;
+        const btn = document.getElementById(`btn-${k}`);
+        if(!btn) continue;
+        document.getElementById(`lv-${k}`).innerText = game.upgrades[k].count + (bulk.count > 0 ? ` (+${bulk.count})` : "");
+        document.getElementById(`cost-${k}`).innerText = formatNumber(bulk.cost);
+        document.getElementById(`eff-curr-${k}`).innerText = formatNumber(Math.floor(game.upgrades[k].count * basePwr));
+        document.getElementById(`eff-next-${k}`).innerText = formatNumber(Math.floor((game.upgrades[k].count + bulk.count) * basePwr));
+
+        if (previousUnlocked || game.seenModules[k]) {
+            btn.style.display = 'flex';
+            btn.style.opacity = (game.score >= bulk.cost && bulk.count > 0) ? "1" : "0.5";
+            btn.style.borderColor = (game.score >= bulk.cost && bulk.count > 0) ? "var(--theme-color)" : "transparent";
+            
+            // 表示されたら seenModules に記録
+            if(!game.seenModules[k]) game.seenModules[k] = true;
+            
+            const abWrap = document.getElementById(`ab-wrap-${k}`);
+            if (i < autoBuyLvl) {
+                abWrap.style.display = 'flex';
+                document.getElementById(`ab-toggle-${k}`).className = `toggle-switch ${game.autoBuyToggles[k] ? 'active' : ''}`;
+            } else { abWrap.style.display = 'none'; }
+        } else { 
+            btn.style.display = 'none'; 
+        }
+
+        // 次のモジュールをアンロックする権利は「現在の所持数が1以上」であること
+        // (これを OR条件にすると、見ただけで全モジュールが一気に開放されてしまうため、ここはAND条件のままにする)
+        if (game.upgrades[k].count === 0) previousUnlocked = false;
+    }
+
+    document.getElementById('current-mult').innerText = "x" + globalMult.toFixed(2);
+    document.getElementById('sys-chal-bonus').innerText = `+${formatNumber((getGlobalChallengeMultiplier() - 1) * 100)}%`;
+    document.getElementById('relic-count').innerText = Math.floor(game.relics);
+    document.getElementById('ether-count').innerText = Math.floor(game.ether);
+    document.getElementById('sys-apotheosis').innerText = game.apotheosisCount; 
+    document.getElementById('ether-display').innerText = Math.floor(game.ether);
+    document.getElementById('sys-prestige').innerText = game.stats.totalPrestige;
+    document.getElementById('sys-transcend').innerText = game.transcendCount;
+    const clickStatEl = document.getElementById('stat-clicks');
+    if(clickStatEl) clickStatEl.innerText = formatNumber(game.stats.totalClicks);
+
+    const eTime = (Date.now() - game.startTime) / 1000;
+    const hh = Math.floor(eTime / 3600).toString().padStart(2, '0');
+    const mm = Math.floor((eTime % 3600) / 60).toString().padStart(2, '0');
+    const ss = Math.floor(eTime % 60).toString().padStart(2, '0');
+    document.getElementById('sys-time').innerText = `${hh}:${mm}:${ss}`;
+
+    const relicGain = calculateRelicGain();
+    const pBtn = document.getElementById('btn-prestige');
+    const pGainText = document.getElementById('prestige-gain');
+    if (game.totalScore >= PRESTIGE_THRESHOLD) {
+        pBtn.disabled = false; pBtn.style.opacity = "1"; pGainText.innerText = `+${formatNumber(relicGain)} Relics`;
+    } else {
+        const unlockTxt = game.settings.lang === 'ja' ? '解禁' : 'Unlock';
+        pBtn.disabled = true; pBtn.style.opacity = "0.5"; pGainText.innerText = `${unlockTxt}: ${formatNumber(PRESTIGE_THRESHOLD)} Score`;
+    }
+
+    const tBtn = document.getElementById('btn-transcend');
+    const etherGain = 1 * getApotheosisMult(); 
+    document.getElementById('transcend-req').innerText = `REQ: ${formatNumber(tReq)} Relics`;
+    if (game.relics >= tReq) { 
+        tBtn.disabled = false; 
+        document.getElementById('transcend-gain').innerText = `GAIN: +${formatNumber(etherGain)} Ether`; 
+    } else { 
+        tBtn.disabled = true; 
+        document.getElementById('transcend-gain').innerText = `GAIN: +0 Ether`; 
+    }
+
+    document.getElementById('artifact-relic-display').innerText = Math.floor(game.relics);
+    for(let k in ARTIFACT_DATA) {
+        const bulk = getBulkArtifactCost(k, buyMode);
+        document.getElementById(`art-lv-${k}`).innerText = game.artifacts[k] + (bulk.count > 0 ? ` (+${bulk.count})` : "");
+        document.getElementById(`art-cost-${k}`).innerText = formatNumber(bulk.cost);
+        document.getElementById(`art-eff-curr-${k}`).innerText = getArtifactEffectString(k, game.artifacts[k]);
+        document.getElementById(`art-eff-next-${k}`).innerText = getArtifactEffectString(k, game.artifacts[k] + bulk.count);
+        const div = document.getElementById(`art-btn-${k}`);
+        div.style.opacity = (game.relics >= bulk.cost && bulk.count > 0) ? "1" : "0.5";
+        div.style.borderColor = (game.relics >= bulk.cost && bulk.count > 0) ? "var(--rare)" : "#333";
+    }
+
+    for(let k in UNIQUE_DATA) {
+        const level = game.uniqueArtifacts[k];
+        const cost = getUniqueArtifactCost(k);
+        const div = document.getElementById(`unique-btn-${k}`);
+        document.getElementById(`u-lv-${k}`).innerText = level;
+        if (level >= UNIQUE_DATA[k].max) { div.classList.add('purchased'); document.getElementById(`u-cost-${k}`).innerText = "---"; }
+        else {
+            div.classList.remove('purchased'); document.getElementById(`u-cost-${k}`).innerText = formatNumber(cost);
+            div.style.opacity = (game.relics >= cost) ? "1" : "0.5";
+            div.style.borderColor = (game.relics >= cost) ? "var(--unique)" : "#333";
+        }
+    }
+
+    for(let k in ADVANCED_DATA) {
+        // 変更: bulk計算を使用
+        const bulk = getBulkAdvancedArtifactCost(k, buyMode);
+        const def = ADVANCED_DATA[k];
+        const currentLevel = game.advancedArtifacts[k] || 0;
+        
+        // レベル表示: (+n) の増加分を表示に追加
+        document.getElementById(`adv-lv-${k}`).innerText = 
+            (def.max ? `${currentLevel}/${def.max}` : currentLevel) + 
+            (bulk.count > 0 ? ` (+${bulk.count})` : "");
+            
+        const div = document.getElementById(`adv-btn-${k}`);
+        
+        if (def.max && currentLevel >= def.max) {
+            document.getElementById(`adv-cost-${k}`).innerText = "ACQUIRED";
+            div.classList.add('purchased');
+            div.style.opacity = "0.5";
+            div.style.borderColor = "#333";
+        } else {
+            // コスト表示を更新
+            document.getElementById(`adv-cost-${k}`).innerText = formatNumber(bulk.cost);
+            div.classList.remove('purchased');
+            
+            // 購入可否判定: コストが払えて、かつ購入数(count)が1以上あるか
+            const canBuy = (game.ether >= bulk.cost && bulk.count > 0);
+            
+            div.style.opacity = canBuy ? "1" : "0.5";
+            div.style.borderColor = canBuy ? "var(--ether)" : "#333";
+        }
+    }
+    updateChallengesUI();
+}
+
+function updateChallengesUI() {
+    checkMaxStats(); 
+    const list = document.getElementById('challenge-list');
+    const lang = game.settings.lang || 'ja';
+    const L = LANG_DATA[lang];
+    const CATEGORY_NAMES = { 
+        'stat': L.catStat, 
+        'module': L.catModule, 
+        'unique': L.catUnique, 
+        'artifact': L.catArtifact, 
+        'advanced': L.catAdvanced
+    };
+    const CATEGORY_ORDER = ['stat', 'module', 'unique', 'artifact', 'advanced'];
+
+    CATEGORY_ORDER.forEach(cat => {
+        let header = document.getElementById(`cat-header-${cat}`);
+        if (!header) {
+            header = document.createElement('div');
+            header.id = `cat-header-${cat}`;
+            header.className = 'challenge-header';
+            list.appendChild(header);
+        }
+        header.innerText = CATEGORY_NAMES[cat];
+        header.style.display = 'none';
+    });
+
+    const sortedKeys = Object.keys(CHALLENGE_DEFS).sort((a, b) => {
+        return (CHALLENGE_DEFS[a].order || 999) - (CHALLENGE_DEFS[b].order || 999);
+    });
+
+    const hasPrestige = (game.prestigeCount > 0 || game.stats.totalPrestige > 0);
+    const hasTranscend = (game.transcendCount > 0) || (game.stats.totalTranscend > 0) || (game.apotheosisCount > 0);
+    const hasArtifacts = hasPrestige || hasTranscend;
+
+    sortedKeys.forEach(k => {
+        const def = CHALLENGE_DEFS[k];
+        if (def.isModule && !game.seenModules[def.key]) return;
+        if ((def.category === 'artifact' || def.category === 'unique') && !hasArtifacts) return;
+        if (def.category === 'advanced' && !hasTranscend) return;
+
+        if (def.key === 'relics' || def.key === 'prestigeCount') { if (!hasArtifacts) return; }
+        if (def.key === 'transcendCount') { if (!hasTranscend) return; }
+        if (def.key === 'apotheosisCount') { if (game.apotheosisCount <= 0) return; }
+
+        const header = document.getElementById(`cat-header-${def.category}`);
+        if(header) header.style.display = 'block';
+
+        const elId = `chal-card-${k}`;
+        let card = document.getElementById(elId);
+        if (!card) {
+            card = document.createElement('div');
+            card.id = elId;
+            card.className = 'challenge-card';
+            card.innerHTML = `
+                <div class="btn-row">
+                    <span class="c-desc" style="font-size:0.85rem; font-weight:bold;"></span>
+                    <span class="c-progress" style="font-size:0.8rem; color:var(--theme-color);"></span>
+                </div>
+                <div class="btn-row" style="margin-top:5px;">
+                    <span class="c-reward" style="font-size:0.75rem; color:#aaa;"></span>
+                </div>
+                <div class="c-btn-area" style="margin-top:5px; width:100%;"></div>`;
+            list.appendChild(card);
+        }
+        
+        const tier = game.challengeTiers[k] || 1;
+        let target;
+        if (def.mode === 'step') target = def.baseTarget * tier;
+        else if (def.mode === 'linear') target = def.baseTarget + (tier - 1);
+        else if (def.isPhase) target = def.baseTarget + (tier - 1);
+        else target = Math.floor(def.baseTarget * Math.pow(def.scale, tier - 1));
+        
+        let maxLvl = Infinity;
+        if(def.isArtifact && ARTIFACT_DATA[def.key] && ARTIFACT_DATA[def.key].max) maxLvl = ARTIFACT_DATA[def.key].max;
+        if(def.isUnique && UNIQUE_DATA[def.key] && UNIQUE_DATA[def.key].max) maxLvl = UNIQUE_DATA[def.key].max;
+        if(def.isAdvanced && ADVANCED_DATA[def.key] && ADVANCED_DATA[def.key].max) maxLvl = ADVANCED_DATA[def.key].max;
+        
+        let current = 0;
+        if(def.key === 'relics') current = game.stats.maxRelics;
+        else if(def.isModule) current = game.stats.maxModules[def.key] || 0;
+        else if(def.isArtifact) current = game.stats.maxArtifacts[def.key] || 0;
+        else if(def.isUnique) current = (game.stats.maxUnique && game.stats.maxUnique[def.key]) || 0;
+        else if(def.isAdvanced) current = (game.stats.maxAdvanced && game.stats.maxAdvanced[def.key]) || 0;
+        else if(def.key in game.stats) current = game.stats[def.key];
+        else if(def.key === 'prestigeCount') current = game.stats.totalPrestige;
+        else if(def.key === 'transcendCount') current = game.stats.totalTranscend || 0;
+        else if(def.key === 'apotheosisCount') current = game.apotheosisCount;
+        else if(def.key === 'currentStage') current = game.stats.maxStage + 1;
+
+        let isCompleted = (target > maxLvl);
+        let rewardText = "";
+        const descText = lang === 'ja' ? def.desc_ja : def.desc_en;
+
+        if (def.category === 'module') {
+            const mName = lang === 'ja' ? MODULE_DATA[def.key].name_ja : MODULE_DATA[def.key].name_en;
+            rewardText = `${L.passiveModule.replace('生産', mName + ' 生産')}`;
+        } else {
+            rewardText = `${L.passiveGlobal} +${(def.rewardBase*100).toFixed(0)}%`;
+        }
+
+        card.querySelector('.c-desc').innerText = `${descText} Tier${tier}`;
+        const progressEl = card.querySelector('.c-progress');
+        const btnArea = card.querySelector('.c-btn-area');
+
+        if (isCompleted) {
+            card.classList.add('completed');
+            card.classList.remove('claimable');
+            progressEl.innerText = "COMPLETED";
+            progressEl.style.color = "var(--unique)";
+            btnArea.innerHTML = '';
+        } else {
+            card.classList.remove('completed');
+            progressEl.innerText = `${formatNumber(current)} / ${formatNumber(target)}`;
+            progressEl.style.color = "var(--theme-color)";
+            
+            if (current >= target) {
+                card.classList.add('claimable');
+                if (!btnArea.querySelector('.claim-btn')) {
+                    btnArea.innerHTML = '';
+                    const btn = document.createElement('button');
+                    btn.className = 'claim-btn';
+                    btn.innerText = L.btnClaim; 
+                    btn.onclick = (e) => { e.stopPropagation(); claimChallenge(k); };
+                    btnArea.appendChild(btn);
+                }
+            } else {
+                card.classList.remove('claimable');
+                btnArea.innerHTML = '';
+            }
+        }
+        card.querySelector('.c-reward').innerText = `${lang === 'ja' ? '報酬' : 'Reward'}: ${rewardText}`;
+    });
+
+    const desiredOrder = [];
+    CATEGORY_ORDER.forEach(cat => {
+        const header = document.getElementById(`cat-header-${cat}`);
+        if(header) desiredOrder.push(header);
+        const catKeys = sortedKeys.filter(k => {
+            const def = CHALLENGE_DEFS[k];
+            if (def.isModule && !game.seenModules[def.key]) return false;
+            if ((def.category === 'artifact' || def.category === 'unique') && !hasArtifacts) return false;
+            if (def.category === 'advanced' && !hasTranscend) return false;
+            if (def.key === 'relics' || def.key === 'prestigeCount') { if (!hasArtifacts) return false; }
+            if (def.key === 'transcendCount') { if (!hasTranscend) return false; }
+            if (def.key === 'apotheosisCount') { if (game.apotheosisCount <= 0) return false; }
+            return def.category === cat;
+        });
+        catKeys.forEach(k => {
+             const c = document.getElementById(`chal-card-${k}`);
+             if(c) desiredOrder.push(c);
+        });
+    });
+
+    const children = Array.from(list.children);
+    let dirty = (children.length !== desiredOrder.length);
+    if(!dirty) {
+        for(let i=0; i<children.length; i++) if(children[i] !== desiredOrder[i]) { dirty = true; break; }
+    }
+    if(dirty) desiredOrder.forEach(el => list.appendChild(el));
+}
+
+function claimChallenge(key, silent = false) {
+    let updated = false;
+    const def = CHALLENGE_DEFS[key];
+    let safetyCounter = 0;
+    while(safetyCounter < 1000) {
+        safetyCounter++;
+        let tier = game.challengeTiers[key] || 1;
+        let target;
+        if (def.mode === 'step') target = def.baseTarget * tier;
+        else if (def.mode === 'linear') target = def.baseTarget + (tier - 1);
+        else if (def.isPhase) target = def.baseTarget + (tier - 1);
+        else target = Math.floor(def.baseTarget * Math.pow(def.scale, tier - 1));
+        
+        let maxLvl = Infinity;
+        if(def.isArtifact && ARTIFACT_DATA[def.key] && ARTIFACT_DATA[def.key].max) maxLvl = ARTIFACT_DATA[def.key].max;
+        if(def.isUnique && UNIQUE_DATA[def.key] && UNIQUE_DATA[def.key].max) maxLvl = UNIQUE_DATA[def.key].max;
+        if(def.isAdvanced && ADVANCED_DATA[def.key] && ADVANCED_DATA[def.key].max) maxLvl = ADVANCED_DATA[def.key].max;
+        if(target > maxLvl) break;
+
+        let current = 0;
+        if(def.key === 'relics') current = game.stats.maxRelics;
+        else if(def.isModule) current = game.stats.maxModules[def.key] || 0;
+        else if(def.isArtifact) current = game.stats.maxArtifacts[def.key] || 0;
+        else if(def.isUnique) current = game.stats.maxUnique[def.key] || 0;
+        else if(def.isAdvanced) current = game.stats.maxAdvanced[def.key] || 0;
+        else if(def.key in game.stats) current = game.stats[def.key];
+        else if(def.key === 'prestigeCount') current = game.stats.totalPrestige;
+        else if(def.key === 'transcendCount') current = game.stats.totalTranscend || 0;
+        else if(def.key === 'apotheosisCount') current = game.apotheosisCount;
+        else if(def.key === 'currentStage') current = game.stats.maxStage + 1;
+        
+        if (current >= target) {
+            game.challengeTiers[key] = tier + 1;
+            updated = true;
+            if(!silent) break;
+        } else break;
+    }
+    if(updated && !silent) updateUI();
+    return updated;
+}
+
+function claimAllChallenges() {
+    let anyUpdated = false;
+    for(let k in CHALLENGE_DEFS) if(claimChallenge(k, true)) anyUpdated = true;
+    if (anyUpdated) {
+        spawnFloater(window.innerWidth/2, window.innerHeight/2, `CLAIMED ALL REWARDS!`, true);
+        updateUI();
+    }
+}
+
+function hasAutoModule() {
+    for(let k in MODULE_DATA) if(MODULE_DATA[k].type === 'auto' && game.upgrades[k].count > 0) return true;
+    return false;
+}
+
+function updateStageConfig(init = false) {
+    const config = getStageConfig(game.currentStage);
+    document.documentElement.style.setProperty('--theme-color', config.color);
+    document.documentElement.style.setProperty('--theme-dim', config.dim);
+    document.getElementById('stage-badge').innerText = config.displayName;
+    
+    // 背景グローの調整
+    const glowLayer = document.getElementById('bg-glow');
+    if (glowLayer) {
+        if (hasAutoModule() && game.settings.bgColor) glowLayer.style.opacity = '0.2'; 
+        else glowLayer.style.opacity = '0';
+    }
+
+    const reactor = document.getElementById('reactor-wrapper');
+    CYCLE_SHAPE_CLASSES.forEach(cls => reactor.classList.remove(cls));
+    reactor.classList.add(config.shapeClass);
+
+    /* --- 回転速度の動的制御ここから --- */
+    // ステージ内での進捗 (0〜4フェーズ) を取得
+    const phaseInStage = game.currentStage % STAGE_DEFS.length;
+    // ベース速度 1.0 に、フェーズが進むごとに 0.2 ずつ加算 (例: 1.0, 1.2, 1.4, 1.6, 1.8)
+    const speedMultiplier = 1.0 + (phaseInStage * 0.2);
+    
+    // 全てのレイヤーのアニメーション速度を更新
+    const layers = reactor.querySelectorAll('.r-layer');
+    layers.forEach(layer => {
+        // layer.getAnimations() で動作中のCSSアニメーションを取得して速度を変更
+        layer.getAnimations().forEach(anim => {
+            anim.updatePlaybackRate(speedMultiplier);
+        });
+    });
+    /* --- 回転速度の動的制御ここまで --- */
+
+    if(!init) spawnFloater(window.innerWidth/2, window.innerHeight/2 - 100, "PHASE SHIFT!", true);
+}
+
+function switchTab(tabName, btn) {
+    // 1. 現在表示されているタブを探し、そのスクロール位置を保存する
+    document.querySelectorAll('.tab-content').forEach(c => {
+        if(c.style.display === 'block') {
+            tabScrollStates[c.id] = c.scrollTop;
+        }
+        c.style.display = 'none'; // ついでに非表示にする
+    });
+
+    // 2. 新しいタブを表示
+    const target = document.getElementById(`tab-${tabName}`);
+    if(target) {
+        target.style.display = 'block';
+        
+        // 3. 記憶していた位置があれば復元する
+        if(tabScrollStates[target.id] !== undefined) {
+            target.scrollTop = tabScrollStates[target.id];
+        }
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+}
+function buyUpgrade(k) {
+    const bulk = getBulkModuleCost(k, buyMode);
+    if (bulk.count > 0 && game.score >= bulk.cost) {
+        game.score -= bulk.cost;
+        game.upgrades[k].count += bulk.count;
+        updateStageConfig(true); // フェーズ更新チェック
+        updateUI();
+    }
+}
+function buyAllModulesMax() {
+    const keys = Object.keys(MODULE_DATA).reverse();
+    let boughtAny = false;
+    for(let k of keys) {
+        const bulk = getBulkModuleCost(k, -1);
+        if(bulk.count > 0 && game.score >= bulk.cost) {
+            game.score -= bulk.cost; game.upgrades[k].count += bulk.count; boughtAny = true;
+        }
+    }
+    if(boughtAny) { updateStageConfig(true); updateUI(); }
+}
+
+function buyArtifact(k) {
+    const bulk = getBulkArtifactCost(k, buyMode);
+    if(bulk.count > 0 && game.relics >= bulk.cost) {
+        game.relics -= bulk.cost; game.artifacts[k] += bulk.count; updateUI(); 
+    }
+}
+
+function buyUniqueArtifact(k) {
+    const cost = getUniqueArtifactCost(k);
+    if (game.uniqueArtifacts[k] < UNIQUE_DATA[k].max && game.relics >= cost) {
+        game.relics -= cost; game.uniqueArtifacts[k]++; updateUI();
+    }
+}
+
+function buyAdvancedArtifact(k) {
+    // 変更: bulk計算関数を使用
+    const bulk = getBulkAdvancedArtifactCost(k, buyMode);
+    
+    if (bulk.count > 0 && game.ether >= bulk.cost) { 
+        game.ether -= bulk.cost; 
+        game.advancedArtifacts[k] += bulk.count; // まとめて加算
+        
+        // 永続化ボーナスの即時適用チェック
+        if(k === 'adv_perm_batch' && game.advancedArtifacts[k] > 0) game.uniqueArtifacts.u_batch = 4;
+        if(k === 'adv_perm_admin' && game.advancedArtifacts[k] > 0) game.uniqueArtifacts.u_claim_all = 1;
+        if(k === 'adv_perm_auto' && game.advancedArtifacts[k] > 0) game.uniqueArtifacts.u_auto_buy = Object.keys(MODULE_DATA).length;
+        
+        updateUI(); 
+    }
+}
+
+function tryPrestige() {
+    const gain = calculateRelicGain();
+    if(gain <= 0) return;
+    const confirmMsg = game.settings.lang === 'ja' ? `次元転生を実行しますか？\n\n獲得レリック: ${gain}` : `Perform Dimension Reset?\n\nGain Relics: ${gain}`;
+    if(!game.settings.confirmations || confirm(confirmMsg)) {
+        game.relics += gain; 
+        game.prestigeCount++; 
+        game.stats.totalPrestige++;
+        resetTier1();
+    }
+}
+
+function tryTranscend() {
+    const req = getTranscendReq();
+    if(game.relics < req) return;
+    
+    // 【変更】倍率をかけず、固定値 1 を獲得するように戻す
+    const gain = 1; 
+    
+    // ... (以下メッセージ部分は後述のステップ4には含まれませんが、機能としてはこれでOK) ...
+    const confirmMsg = game.settings.lang === 'ja' ? `【警告】超越を実行しますか？\n\n獲得エーテル: +${gain}\n\nこれまでの全ての進行度、モジュール、通常/ユニークアーティファクトがリセットされます。\n(超越アーティファクトは維持されます)` : `[WARNING] Perform Transcendence?\n\nGain Ether: +${gain}\n\nAll progress, modules, and artifacts will be reset. (Advanced Artifacts will remain)`;
+    if(!game.settings.confirmations || confirm(confirmMsg)) {
+        game.ether += gain; 
+        game.transcendCount++; 
+        game.stats.totalTranscend++; 
+        resetTier2();
+    }
+}
+
+function tryApotheosis() {
+    const req = getApotheosisReq();
+    if(game.currentStage + 1 < req) return;
+    
+    const nextCount = game.apotheosisCount + 1;
+    const nextOther = nextCount * 10;
+    
+    // メッセージから「スコア」の記述を削除
+    const confirmMsg = game.settings.lang === 'ja' 
+        ? `【真化 - APOTHEOSIS】\n\nこの操作は、エーテル、超越アーティファクト、超越回数を含む全てのデータをリセットします。\n\n実行すると以下の永続ボーナスを獲得します：\n次回から初期所持数ボーナス\nエーテル +${nextOther}\n\n実行しますか？` 
+        : `[APOTHEOSIS]\n\nThis will reset EVERYTHING including Ether.\n\nNew Bonus:\nStart with:\n+${nextOther} Ether\n\nProceed?`;
+        
+    if(!game.settings.confirmations || confirm(confirmMsg)) {
+        game.apotheosisCount++;
+        resetTier3();
+    }
+}
+
+function resetTier1() {
+    checkMaxStats();
+    // 【変更】スコアには ScoreBonus (100倍) を使用
+    const scoreBonus = getApotheosisScoreBonus();
+    game.score = scoreBonus; 
+    game.totalScore = scoreBonus;
+    
+    game.currentStage = 0;
+    particles = []; 
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for(let k in MODULE_DATA) { if(!game.upgrades[k]) game.upgrades[k] = {}; game.upgrades[k].count = 0; }
+    if(game.advancedArtifacts.adv_perm_batch) game.uniqueArtifacts.u_batch = 4;
+    if(game.advancedArtifacts.adv_perm_admin) game.uniqueArtifacts.u_claim_all = 1;
+    if(game.advancedArtifacts.adv_perm_auto) game.uniqueArtifacts.u_auto_buy = Object.keys(MODULE_DATA).length;
+    const glowLayer = document.getElementById('bg-glow');
+    if(glowLayer) { glowLayer.style.opacity = '0'; void glowLayer.offsetWidth; }
+    updateStageConfig(); 
+    saveGame();
+}
+
+function resetTier2() {
+    saveScrollPositions();
+    checkMaxStats(); 
+    const scoreBonus = getApotheosisScoreBonus();
+    const otherBonus = getApotheosisStartBonus();
+    
+    game.score = scoreBonus; 
+    game.totalScore = scoreBonus; 
+    game.relics = 0;
+    
+    game.prestigeCount = 0; game.currentStage = 0;
+    particles = []; ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for(let k in MODULE_DATA) if(game.upgrades[k]) game.upgrades[k].count = 0;
+    for(let k in ARTIFACT_DATA) game.artifacts[k] = 0;
+    for(let k in UNIQUE_DATA) game.uniqueArtifacts[k] = 0;
+    if(game.advancedArtifacts.adv_perm_batch) game.uniqueArtifacts.u_batch = 4;
+    if(game.advancedArtifacts.adv_perm_admin) game.uniqueArtifacts.u_claim_all = 1;
+    if(game.advancedArtifacts.adv_perm_auto) game.uniqueArtifacts.u_auto_buy = Object.keys(MODULE_DATA).length;
+    updateStageConfig(); 
+    saveGame(); 
+    location.reload();
+}
+
+function resetTier3() {
+    saveScrollPositions();
+    checkMaxStats();
+    const scoreBonus = getApotheosisScoreBonus();
+    const otherBonus = getApotheosisStartBonus();
+    
+    game.score = scoreBonus; 
+    game.totalScore = scoreBonus; 
+    game.relics = 0; 
+    game.ether = otherBonus;
+    
+    game.prestigeCount = 0;
+    game.transcendCount = 0;
+    game.currentStage = 0;
+    particles = []; ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for(let k in game.upgrades) game.upgrades[k].count = 0;
+    for(let k in game.artifacts) game.artifacts[k] = 0;
+    for(let k in game.uniqueArtifacts) game.uniqueArtifacts[k] = 0;
+    for(let k in game.advancedArtifacts) game.advancedArtifacts[k] = 0; 
+    updateStageConfig(); 
+    spawnFloater(window.innerWidth/2, window.innerHeight/2, "APOTHEOSIS COMPLETE", true);
+    game.settings.buyMode = 1;
+    saveGame(); 
+    location.reload();
+}
+
+function gameLoop() {
+    let now = Date.now(); let dt = (now - lastTime) / 1000; lastTime = now;
+    let effectiveDt = dt * getTimeSpeed();
+    let inc = getAutoIncome(); if(inc > 0) addScore(inc * effectiveDt);
+    const acLevel = getArtifactEffectValue('art_auto_click', game.artifacts.art_auto_click);
+    if (acLevel > 0) {
+        autoClickAccumulator += effectiveDt * acLevel;
+        if (autoClickAccumulator >= 1) {
+            const clicks = Math.floor(autoClickAccumulator);
+            autoClickAccumulator -= clicks;
+            const critChance = getArtifactEffectValue('art_crit', game.artifacts.art_crit);
+            const critMult = getArtifactEffectValue('art_crit_dmg', game.artifacts.art_crit_dmg);
+            const basePwr = getClickPower();
+            let totalDmg = 0;
+            const rect = document.getElementById('reactor-wrapper').getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+            for(let i=0; i<clicks; i++) {
+                let dmg = basePwr; let isCrit = false;
+                if(Math.random() < critChance) { dmg *= critMult; isCrit = true; }
+                totalDmg += dmg;
+                if (i < 3 && game.settings.numbers) {
+                    spawnFloater(cx + (Math.random()-0.5)*100, cy + (Math.random()-0.5)*100, `+${formatNumber(dmg)}`, isCrit);
+                }
+            }
+            addScore(totalDmg); game.stats.totalClicks += clicks;
+        }
+    }
+    const autoBuyLevel = game.uniqueArtifacts.u_auto_buy;
+    const keys = Object.keys(MODULE_DATA);
+    for(let i=0; i<Math.min(keys.length, autoBuyLevel); i++) {
+        const k = keys[i];
+        if (game.autoBuyToggles[k]) {
+            const bulk = getBulkModuleCost(k, 1);
+            if (bulk.count > 0 && game.score >= bulk.cost) {
+                game.score -= bulk.cost; game.upgrades[k].count += bulk.count;
+            }
+        }
+    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.globalCompositeOperation = 'lighter'; 
+    for(let i=particles.length-1; i>=0; i--) {
+        particles[i].update(); particles[i].draw(ctx); if(particles[i].life<=0) particles.splice(i,1);
+    }
+    if(inc > 0 && Math.random() < 0.1) {
+        let rect = document.getElementById('reactor-wrapper').getBoundingClientRect();
+        spawnParticles(rect.left+rect.width/2, rect.top+rect.height/2, 1, 'idle');
+    }
+    requestAnimationFrame(gameLoop);
+}
+
+class Particle {
+    constructor(x, y, type) {
+        this.x = x; this.y = y; this.type = type;
+        const config = getStageConfig(game.currentStage);
+        const angle = Math.random() * 6.28; let speed = Math.random() * 3 + 1;
+        this.size = Math.random() * 3 + 2; this.life = 1.0; this.decay = Math.random() * 0.03 + 0.01;
+        this.color = config.color; 
+        const shapes = ['circle', 'triangle', 'square', 'pentagon', 'hexagon', 'octagon', 'rhombus', 'pentagram', 'hexagram', 'legendary'];
+        let shapeIndex = (game.currentStage) % shapes.length;
+        this.shape = shapes[shapeIndex];
+        if(type === 'crit') { this.color = '#fff'; speed *= 2; this.size = 6; this.shape = 'legendary'; }
+        else if(type === 'relic') { this.color = '#b042ff'; this.decay = 0.01; this.shape = 'rhombus'; }
+        else if(type === 'stageup') { this.color = '#ffffff'; speed *= 4; this.life = 1.5; }
+        this.vx = Math.cos(angle) * speed; this.vy = Math.sin(angle) * speed;
+    }
+    update() { this.x += this.vx; this.y += this.vy; this.life -= this.decay; this.size *= 0.96; }
+    draw(ctx) {
+        ctx.globalAlpha = this.life; ctx.fillStyle = this.color; ctx.strokeStyle = this.color; ctx.lineWidth = 2; ctx.beginPath();
+        drawComplexShape(ctx, this.x, this.y, this.size, this.shape);
+        ctx.fill();
+        if (['square', 'triangle', 'rhombus', 'pentagon', 'hexagon', 'octagon'].includes(this.shape)) ctx.stroke();
+        if(game.settings.bloom) { ctx.shadowBlur = 10; ctx.shadowColor = this.color; }
+        else ctx.shadowBlur = 0;
+    }
+}
+
+function drawComplexShape(ctx, x, y, r, type) {
+    switch(type) {
+        case 'circle': ctx.arc(x, y, r, 0, 6.28); break;
+        case 'triangle': drawPoly(ctx, x, y, r, 3); break;
+        case 'square': ctx.rect(x-r, y-r, r*2, r*2); break;
+        case 'pentagon': drawPoly(ctx, x, y, r, 5); break;
+        case 'hexagon': drawPoly(ctx, x, y, r, 6); break;
+        case 'octagon': drawPoly(ctx, x, y, r, 8); break;
+        case 'rhombus': ctx.moveTo(x, y-r*1.5); ctx.lineTo(x+r, y); ctx.lineTo(x, y+r*1.5); ctx.lineTo(x-r, y); break;
+        case 'pentagram': drawStar(ctx, x, y, r, 5, 0.5); break;
+        case 'hexagram': drawStar(ctx, x, y, r, 6, 0.6); break;
+        case 'legendary': drawStar(ctx, x, y, r, 12, 0.4); break;
+        default: ctx.arc(x, y, r, 0, 6.28);
+    }
+}
+
+function drawPoly(ctx, x, y, r, sides) {
+    ctx.moveTo(x + r * Math.cos(0), y + r * Math.sin(0));
+    for (let i = 1; i <= sides; i++) ctx.lineTo(x + r * Math.cos(i * 2 * Math.PI / sides), y + r * Math.sin(i * 2 * Math.PI / sides));
+}
+
+function drawStar(ctx, x, y, r, p, ins) {
+    ctx.moveTo(x, y - r);
+    for (let i = 0; i < p * 2; i++) {
+        const rad = (i % 2 === 0) ? r : r * ins;
+        const a = (Math.PI / p) * i - Math.PI / 2;
+        ctx.lineTo(x + rad * Math.cos(a), y + rad * Math.sin(a));
+    }
+}
+
+function spawnParticles(x, y, count, type) {
+    let limit = 300;
+    if (game.settings.particles === 'med') { count = Math.ceil(count * 0.5); limit = 150; }
+    if (game.settings.particles === 'low') { count = Math.ceil(count * 0.2); limit = 60; }
+    if(particles.length > limit) particles.splice(0, count);
+    for(let i=0; i<count; i++) particles.push(new Particle(x, y, type));
+}
+
+function spawnFloater(x, y, txt, isCrit) {
+    const d = document.createElement('div'); d.className = 'floater'; d.innerText = txt;
+    d.style.left = x + 'px'; d.style.top = y + 'px';
+    if(isCrit) { d.style.color = '#ff0055'; d.style.fontSize = '1.5rem'; }
+    document.body.appendChild(d); setTimeout(()=>d.remove(), 800);
+}
+function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+function formatNumber(num) {
+    if (isNaN(num) || num === 0) return "0";
+    
+    // 100,000未満（E+5未満）は通常のカンマ区切り表記
+    if (num < 100000) {
+        return Math.floor(num).toLocaleString();
+    }
+
+    // 100,000以上（E+5以上）は工学表記に切り替え
+    const exponent = Math.floor(Math.log10(num));
+    const engExponent = Math.floor(exponent / 3) * 3;
+    const mantissa = num / Math.pow(10, engExponent);
+
+    // 見栄えを整えるため、仮数部は小数点第2位まで表示
+    return mantissa.toFixed(2) + " E+" + engExponent;
+}
+function saveGame() { 
+    game.lastSaveTime = Date.now(); 
+    localStorage.setItem('neoEvoSaveV16', JSON.stringify(game)); 
+}
+function manualSave() { 
+    saveGame(); 
+    const btn = document.getElementById('btn-manual-save');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = game.settings.lang === 'ja' ? "✅ 保存完了！" : "✅ SAVE COMPLETE!";
+    btn.style.borderColor = "#00ff00"; btn.style.color = "#00ff00";
+    spawnFloater(window.innerWidth / 2, window.innerHeight / 2, "DATA SAVED!", true);
+    setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.style.borderColor = "var(--unique)"; btn.style.color = "var(--unique)";
+    }, 1500);
+}
+
+function fixGameData(data) {
+    if(!game.skinSettings) game.skinSettings = { mode: 'auto', manualColor: 'auto', manualShape: 'auto' };
+    game = { ...game, ...data };
+    
+    // 基本設定の修復
+    if(!game.upgrades) game.upgrades = {};
+    if(!game.settings) game.settings = { particles: 'high', bloom: true, blur: true, numbers: true, bgColor: true, lang: 'ja' };
+    if(game.settings.bgColor === undefined) game.settings.bgColor = true;
+    if(game.settings.lang === undefined) game.settings.lang = 'ja';
+    if(game.settings.buyMode === undefined) game.settings.buyMode = 1;
+    if(game.settings.confirmations === undefined) game.settings.confirmations = true;
+    if(game.apotheosisCount === undefined) game.apotheosisCount = 0;
+    
+    // 統計データの修復 (ここが重要)
+    if(!game.stats) game.stats = {};
+    const s = game.stats;
+    if(s.totalClicks === undefined) s.totalClicks = 0;
+    if(s.maxStage === undefined) s.maxStage = 0;
+    if(s.maxRelics === undefined) s.maxRelics = 0;
+    if(s.totalPrestige === undefined) s.totalPrestige = 0;
+    if(s.totalTranscend === undefined) s.totalTranscend = game.transcendCount || 0;
+    
+    // 各種MAX統計のオブジェクトが存在しない場合は作成
+    if(!s.maxModules) s.maxModules = {};
+    if(!s.maxArtifacts) s.maxArtifacts = {};
+    if(!s.maxUnique) s.maxUnique = {};
+    if(!s.maxAdvanced) s.maxAdvanced = {};
+
+    // データの整合性チェック
+    if(!game.advancedArtifacts) game.advancedArtifacts = {}; // これがないとエラーになる
+    
+    for(let k in MODULE_DATA) { 
+        if(!game.upgrades[k]) game.upgrades[k] = {count:0}; 
+        if(game.autoBuyToggles[k]===undefined) game.autoBuyToggles[k]=false; 
+    }
+    for(let k in ARTIFACT_DATA) if(!game.artifacts[k]) game.artifacts[k] = 0;
+    for(let k in UNIQUE_DATA) if(!game.uniqueArtifacts[k]) game.uniqueArtifacts[k] = 0;
+    for(let k in ADVANCED_DATA) if(game.advancedArtifacts[k] === undefined) game.advancedArtifacts[k] = 0;
+    
+    if(!game.challengeTiers) game.challengeTiers = {};
+    for(let k in CHALLENGE_DEFS) if(!game.challengeTiers[k]) game.challengeTiers[k] = 1;
+    
+    if(!game.seenModules) game.seenModules = {};
+    for(let k in MODULE_DATA) {
+        // もし過去に1つでも所持した記録(maxModules)があれば、既読(seen)にする
+        if (game.stats.maxModules[k] > 0) {
+            game.seenModules[k] = true;
+        }
+    }
+}
+function loadGame() {
+    const save = localStorage.getItem('neoEvoSaveV16');
+    if(save) {
+        try { fixGameData(JSON.parse(save)); } catch(e) { console.error("Save Load Error", e); }
+    }
+}
+// ★追加: スクロール位置を保存する関数
+function saveScrollPositions() {
+    // タブの状態保存
+    document.querySelectorAll('.tab-content').forEach(c => {
+        if(c.style.display === 'block') {
+            tabScrollStates[c.id] = c.scrollTop;
+        }
+    });
+
+    const scrollData = {};
+    
+    // ■ 左側のモジュールリスト：ピクセルではなく「一番上に見えている要素」を記録する
+    const upgradeList = document.getElementById('upgrade-list');
+    if(upgradeList) {
+        scrollData['upgrade-list-px'] = upgradeList.scrollTop; // 保険としてピクセルも保存
+        
+        const currentScroll = upgradeList.scrollTop;
+        const children = Array.from(upgradeList.children);
+        
+        // 見えている一番上の要素を探す
+        for(let child of children) {
+            if(child.style.display === 'none') continue;
+            // 要素の下端が、現在のスクロール位置より下にあれば、それが「現在見えている一番上の要素」
+            if (child.offsetTop + child.offsetHeight > currentScroll) {
+                scrollData['upgrade-anchor'] = { 
+                    id: child.id, 
+                    offset: currentScroll - child.offsetTop // 要素の頭から何ピクセルずれているか
+                };
+                break;
+            }
+        }
+    }
+    
+    // 右側の各タブ
+    scrollData['tabStates'] = tabScrollStates;
+
+    // アクティブなタブID
+    const activeBtn = document.querySelector('.tab-btn.active');
+    if(activeBtn) scrollData['activeTabId'] = activeBtn.id;
+
+    sessionStorage.setItem('neoEvoScrollState', JSON.stringify(scrollData));
+}
+
+// ★修正: スクロール位置を復元する関数（補正強化版）
+function restoreScrollPositions() {
+    const data = sessionStorage.getItem('neoEvoScrollState');
+    if(!data) return;
+
+    try {
+        const scrollData = JSON.parse(data);
+        
+        // タブの復元
+        if(scrollData.activeTabId) {
+            const btn = document.getElementById(scrollData.activeTabId);
+            if(btn) {
+                let tabName = 'system';
+                if(btn.id.includes('artifacts')) tabName = 'artifacts';
+                else if(btn.id.includes('challenges')) tabName = 'challenges';
+                else if(btn.id.includes('transcend')) tabName = 'transcend';
+                switchTab(tabName, btn);
+            }
+        }
+
+        // スクロール位置を適用する内部関数
+        const applyScroll = () => {
+            // ■ 左側リストの復元（アンカー方式）
+            const uList = document.getElementById('upgrade-list');
+            if(uList) {
+                // アンカー情報があればそれを使って位置合わせ
+                if (scrollData['upgrade-anchor'] && scrollData['upgrade-anchor'].id) {
+                    const anchorId = scrollData['upgrade-anchor'].id;
+                    const offset = scrollData['upgrade-anchor'].offset || 0;
+                    const anchorEl = document.getElementById(anchorId);
+                    
+                    if (anchorEl) {
+                        uList.scrollTop = anchorEl.offsetTop + offset;
+                    }
+                } else if (scrollData['upgrade-list-px']) {
+                    // アンカーがない場合はピクセル値（保険）
+                    uList.scrollTop = scrollData['upgrade-list-px'];
+                }
+            }
+
+            // ■ 右側タブの復元
+            if(scrollData['tabStates']) {
+                tabScrollStates = scrollData['tabStates'];
+                // 現在表示中のタブにも即適用
+                document.querySelectorAll('.tab-content').forEach(c => {
+                    if(c.style.display === 'block' && tabScrollStates[c.id] !== undefined) {
+                        c.scrollTop = tabScrollStates[c.id];
+                    }
+                });
+            }
+        };
+
+        // ★重要: フォント読み込みやレイアウト確定のズレを防ぐため、
+        // タイミングを変えて3回実行し、位置を強制的に合わせる
+        applyScroll(); // 即時
+        setTimeout(applyScroll, 50);  // 50ms後
+        setTimeout(() => {
+            applyScroll();            // 200ms後（最終確定）
+            sessionStorage.removeItem('neoEvoScrollState');
+        }, 200);
+
+    } catch(e) {
+        console.error("Scroll Restore Error", e);
+    }
+}
+
+function resetSave() { if(confirm("データを完全に削除しますか？")) { localStorage.removeItem('neoEvoSaveV16'); location.reload(); } }
+document.addEventListener('DOMContentLoaded', init);
+/* =========================================
+    SKIN MENU CONTROLS
+   ========================================= */
+function toggleSkinModal(show) {
+    const modal = document.getElementById('skin-modal');
+    if (!modal) return;
+    modal.style.display = show ? 'flex' : 'none';
+    if(show) {
+        const lang = game.settings.lang || 'ja';
+        const L = LANG_DATA[lang];
+        const colorSelect = document.getElementById('skin-color-select');
+        const shapeSelect = document.getElementById('skin-shape-select');
+        
+        // ★修正：言語設定に合わせて名前を切り替える
+        const labelAuto = (lang === 'ja') ? "デフォルト" : "Default";
+        
+        // カラー選択肢の生成
+        let colorOptions = `<option value="auto" ${game.skinSettings.manualColor === 'auto' ? 'selected' : ''}>${labelAuto}</option>`;
+        colorOptions += STAGE_DEFS.map((d, i) => {
+            const displayName = (lang === 'ja') ? d.name_ja : d.name;
+            return `<option value="${i}" ${game.skinSettings.manualColor == i ? 'selected' : ''}>${displayName}</option>`;
+        }).join('');
+        colorSelect.innerHTML = colorOptions;
+
+        // 形状選択肢の生成
+        let shapeOptions = `<option value="auto" ${game.skinSettings.manualShape === 'auto' ? 'selected' : ''}>${labelAuto}</option>`;
+        shapeOptions += CYCLE_SHAPE_CLASSES.map((s, i) => `<option value="${i}" ${game.skinSettings.manualShape == i ? 'selected' : ''}>Stage ${i+1}</option>`).join('');
+        shapeSelect.innerHTML = shapeOptions;
+    }
+}
+
+function updateManualSkin() {
+    const colorVal = document.getElementById('skin-color-select').value;
+    const shapeVal = document.getElementById('skin-shape-select').value;
+    
+    // 'auto' の場合は文字列のまま保存し、それ以外は数値として保存
+    game.skinSettings.manualColor = (colorVal === 'auto') ? 'auto' : parseInt(colorVal);
+    game.skinSettings.manualShape = (shapeVal === 'auto') ? 'auto' : parseInt(shapeVal);
+    
+    updateStageConfig(true);
+    updateUI();
+}
+</script>
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('sw.js').then(function(registration) {
+                console.log('ServiceWorker registration successful');
+            }, function(err) {
+                console.log('ServiceWorker registration failed: ', err);
+            });
+        });
+    }
+</script>
+</body>
+</html>
+
+
+
