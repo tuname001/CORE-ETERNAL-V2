@@ -1,4 +1,4 @@
-var CACHE_NAME = 'core-eternal-strict-v7';
+var CACHE_NAME = 'core-eternal-strict-V2';
 
 var urlsToCache = [
   '/CORE-ETERNAL-V2/index.html',  // start_urlと完全に一致させる（最重要）
@@ -44,4 +44,5 @@ self.addEventListener('fetch', function(event) {
       })
   );
 });
+
 
