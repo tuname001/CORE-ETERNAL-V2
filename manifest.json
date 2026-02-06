@@ -1,6 +1,6 @@
 {
   "name": "CORE ETERNAL",
-  "short_name": "CORE",
+  "short_name": "CORE ETERNAL",
   "theme_color": "#000000",
   "background_color": "#000000",
   "display": "standalone",
@@ -20,3 +20,4 @@
     }
   ]
 }
+
