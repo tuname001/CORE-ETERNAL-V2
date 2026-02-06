@@ -1,10 +1,10 @@
 var CACHE_NAME = 'core-eternal-strict-v7';
 
 var urlsToCache = [
-  '/CORE-ETERNAL/index.html',  // start_urlと完全に一致させる（最重要）
-  '/CORE-ETERNAL/',            // 念のためルートも確保
-  '/CORE-ETERNAL/icon.png',
-  '/CORE-ETERNAL/manifest.json'
+  '/CORE-ETERNAL-V2/index.html',  // start_urlと完全に一致させる（最重要）
+  '/CORE-ETERNAL-V2/',            // 念のためルートも確保
+  '/CORE-ETERNAL-V2/icon.png',
+  '/CORE-ETERNAL-V2/manifest.json'
 ];
 
 self.addEventListener('install', function(event) {
@@ -44,3 +44,4 @@ self.addEventListener('fetch', function(event) {
       })
   );
 });
+
